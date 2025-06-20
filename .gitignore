@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python/
+env/
+venv/
+*.env
+.idea/  # For PyCharm/IntelliJ users
+.vscode/ # For VS Code users
+*.log
+*.db
+
+# SITL logs/output
+logs/
+sitl.out
+sitl.err
+
+# Ollama models (if downloaded directly into project)
+ollama_models/
