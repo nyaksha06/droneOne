@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 async def position_velocity_ned_callback(pos_vel_ned):
     logger.info(f"POS_NED: North={pos_vel_ned.position.north_m:.2f}m, "
                 f"East={pos_vel_ned.position.east_m:.2f}m, "
-                f"Down={pos_vel_ned.position.down_m:.2f}m, "
-                f"RelAlt={pos_vel_ned.position.relative_altitude_m:.2f}m")
+                f"Down={pos_vel_ned.position.down_m:.2f}m"
+                )
     logger.info(f"VEL_NED: Vx={pos_vel_ned.velocity.north_m_s:.2f}m/s, "
                 f"Vy={pos_vel_ned.velocity.east_m_s:.2f}m/s, "
                 f"Vz={pos_vel_ned.velocity.down_m_s:.2f}m/s")
