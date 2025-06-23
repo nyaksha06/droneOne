@@ -2,7 +2,7 @@
 set -e
 
 echo "Starting PX4 SITL with Gazebo (Iris model)..."
-PX4_AUTOPILOT_DIR="~/p2/PX4-Autopilot"
+PX4_AUTOPILOT_DIR="p2/PX4-Autopilot"
 
 # Check if the PX4-Autopilot directory exists
 if [ ! -d "$PX4_AUTOPILOT_DIR" ]; then
