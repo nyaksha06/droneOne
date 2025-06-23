@@ -3,7 +3,7 @@ from mavsdk import System
 import logging
 import sys
 
-# Configure general logging for our application
+
 logging.basicConfig(level=logging.INFO, stream=sys.stdout,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -22,24 +22,24 @@ class MAVSDKInterface:
     """
 
     def __init__(self, system_address: str = "udp://:14540"):
+        # --- FIX for MAVSDK 1.3.0 API: System() constructor takes no arguments ---
         self.drone = System()
-        self._system_address = system_address
-        logger.info(f"MAVSDKInterface initialized for system address: {system_address}")
+        self._system_address = system_address # Store the address to use with connect()
+        self.is_connected = False
+        logger.info(f"MAVSDKInterface initialized for system address: {self._system_address}")
 
     async def connect(self):
-        logger.info(f"Attempting to connect to the drone at {self.drone.sys_address}...")
+        logger.info(f"Attempting to connect to the drone at {self._system_address}...")
         try:
+    
+            await self.drone.connect(system_address=self._system_address)
+            logger.info("MAVSDK connection initiated. Waiting for state...")
+
            
-            # Wait for connection
-            async for state in self.drone.core.connection_state():
-                if state.is_connected:
-                    logger.info("MAVSDK connected!")
-                    break
-            
-            
             async for health in self.drone.telemetry.health():
+                
                 if health.is_global_position_ok and health.is_home_position_ok:
-                    logger.info("Drone global and home position are OK.")
+                    logger.info("Drone global and home position are OK. Connected and Ready!")
                     self.is_connected = True
                     return True
                 else:
@@ -49,13 +49,12 @@ class MAVSDKInterface:
             logger.error(f"Error during drone connection: {e}")
             self.is_connected = False
             return False
-        return False 
+        return False
 
     async def arm(self):
         if not self.is_connected:
             logger.warning("Drone not connected. Cannot arm.")
             return False
-        
         
         async for is_armed in self.drone.telemetry.armed():
             if is_armed:
@@ -73,6 +72,9 @@ class MAVSDKInterface:
             return False
 
     async def disarm(self):
+        """
+        Disarms the drone.
+        """
         if not self.is_connected:
             logger.warning("Drone not connected. Cannot disarm.")
             return False
@@ -109,7 +111,7 @@ class MAVSDKInterface:
                 if current_altitude >= altitude_m * 0.95: # Within 95% of target
                     logger.info(f"Reached target altitude of approx {altitude_m}m.")
                     return True
-                await asyncio.sleep(0.5) 
+                await asyncio.sleep(0.5) # Check every 0.5 seconds
         except Exception as e:
             logger.error(f"Failed to takeoff: {e}")
             return False
@@ -122,13 +124,12 @@ class MAVSDKInterface:
         logger.info("Landing drone...")
         try:
             await self.drone.action.land()
-            
             logger.info("Land command sent. Monitoring altitude...")
             async for position in self.drone.telemetry.position():
                 if position.relative_altitude_m < 0.5: 
                     logger.info("Drone has landed.")
                     return True
-                await asyncio.sleep(1)
+                await asyncio.sleep(1) 
         except Exception as e:
             logger.error(f"Failed to land drone: {e}")
             return False
