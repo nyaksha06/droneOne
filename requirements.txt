@@ -1,2 +1,2 @@
-mavsdk
+mavsdk==1.3.0
 asyncio
