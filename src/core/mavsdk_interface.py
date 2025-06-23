@@ -22,8 +22,8 @@ class MAVSDKInterface:
     """
 
     def __init__(self, system_address: str = "udp://:14540"):
-        self.drone = System(sys_address=system_address)
-        self.is_connected = False
+        self.drone = System()
+        self._system_address = system_address
         logger.info(f"MAVSDKInterface initialized for system address: {system_address}")
 
     async def connect(self):
