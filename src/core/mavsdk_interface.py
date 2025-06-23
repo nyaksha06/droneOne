@@ -143,6 +143,15 @@ class MAVSDKInterface:
         async for pos_vel_ned in self.drone.telemetry.position_velocity_ned():
             await callback(pos_vel_ned)
 
+    async def subscribe_position(self, callback):
+        """
+        Subscribes to global position (latitude, longitude, altitude) data.
+        :param callback: An async function to call with the Position data.
+        """
+        logger.info("Subscribing to Global Position...")
+        async for position in self.drone.telemetry.position():
+            await callback(position)
+
     async def subscribe_attitude_euler(self, callback):
         """
         Subscribes to attitude (Euler angles) data.

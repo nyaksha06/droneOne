@@ -14,15 +14,20 @@ logging.basicConfig(level=logging.INFO, stream=sys.stdout,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-async def position_callback(pos_vel_ned):
-    """Callback for position and velocity NED telemetry."""
-    logger.info(f"POS_NED: Lat={pos_vel_ned.position.latitude_deg:.6f}, "
-                f"Lon={pos_vel_ned.position.longitude_deg:.6f}, "
-                f"Alt={pos_vel_ned.position.absolute_altitude_m:.2f}m (Abs), "
-                f"RelAlt={pos_vel_ned.position.relative_altitude_m:.2f}m (Rel)")
+async def position_velocity_ned_callback(pos_vel_ned):
+    logger.info(f"POS_NED: North={pos_vel_ned.position.north_m:.2f}m, "
+                f"East={pos_vel_ned.position.east_m:.2f}m, "
+                f"Down={pos_vel_ned.position.down_m:.2f}m, "
+                f"RelAlt={pos_vel_ned.position.relative_altitude_m:.2f}m")
     logger.info(f"VEL_NED: Vx={pos_vel_ned.velocity.north_m_s:.2f}m/s, "
                 f"Vy={pos_vel_ned.velocity.east_m_s:.2f}m/s, "
                 f"Vz={pos_vel_ned.velocity.down_m_s:.2f}m/s")
+
+async def global_position_callback(position):
+    logger.info(f"GLOBAL_POS: Lat={position.latitude_deg:.6f}, "
+                f"Lon={position.longitude_deg:.6f}, "
+                f"AbsAlt={position.absolute_altitude_m:.2f}m, "
+                f"RelAlt={position.relative_altitude_m:.2f}m")
 
 async def attitude_callback(att_euler):
     """Callback for attitude (Euler angles) telemetry."""
@@ -47,8 +52,9 @@ async def main():
         logger.error("Failed to connect to the drone. Exiting.")
         return
 
-    # Subscribe to telemetry streams
-    asyncio.ensure_future(mavsdk_interface.subscribe_position_velocity_ned(position_callback))
+
+    asyncio.ensure_future(mavsdk_interface.subscribe_position_velocity_ned(position_velocity_ned_callback))
+    asyncio.ensure_future(mavsdk_interface.subscribe_position(global_position_callback))
     asyncio.ensure_future(mavsdk_interface.subscribe_attitude_euler(attitude_callback))
     asyncio.ensure_future(mavsdk_interface.subscribe_battery(battery_callback))
 
@@ -56,9 +62,9 @@ async def main():
     logger.info("You can open QGroundControl/Mission Planner to see the drone.")
     logger.info("Press Ctrl+C to stop.")
 
-    # Keep the script running indefinitely to receive telemetry
+
     while True:
-        await asyncio.sleep(1) # Keep main loop alive
+        await asyncio.sleep(1) 
 
 if __name__ == "__main__":
     try:
