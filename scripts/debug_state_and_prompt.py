@@ -54,7 +54,7 @@ async def main():
         await telemetry_processor.process_battery(battery_status)
 
     async def flight_mode_handler(flight_mode_status):
-        drone_state.update_flight_mode(flight_mode_status.mode)
+        drone_state.update_flight_mode(str(flight_mode_status))
 
 
     # Start MAVSDK telemetry subscriptions concurrently
