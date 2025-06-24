@@ -63,8 +63,8 @@ class TelemetryProcessor:
 
         if self._latest_position_ned:
             data["position"] = {
-                # "latitude_deg": self._latest_position_ned.position.latitude_deg,
-                # "longitude_deg": self._latest_position_ned.position.longitude_deg,
+                "latitude_deg": self._latest_position_ned.position.latitude_deg,
+                "longitude_deg": self._latest_position_ned.position.longitude_deg,
                 "absolute_altitude_m": self._latest_position_ned.position.absolute_altitude_m,
                 "relative_altitude_m": self._latest_position_ned.position.relative_altitude_m,
             }
