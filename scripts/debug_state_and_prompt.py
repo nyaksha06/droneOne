@@ -42,9 +42,10 @@ async def main():
     # Callbacks to update TelemetryProcessor with raw MAVSDK data
     async def position_velocity_ned_handler(pos_vel_ned):
         await telemetry_processor.process_position_velocity_ned(pos_vel_ned)
-    
+        
     async def global_position_handler(position):
-        pass 
+        # Now explicitly process global position in TelemetryProcessor
+        await telemetry_processor.process_global_position(position)
 
     async def attitude_euler_handler(att_euler):
         await telemetry_processor.process_attitude_euler(att_euler)
@@ -80,20 +81,22 @@ async def main():
         # 3. Update central drone state
         drone_state.update_telemetry(processed_telemetry)
         drone_state.update_visual_insights(visual_insights)
-        # Note: Flight mode is updated via its direct subscription handler above
+        # Flight mode is updated via its direct subscription handler
 
         # 4. Generate LLM prompt
         llm_prompt = drone_state.generate_llm_prompt()
 
         # 5. Log the generated prompt periodically
-        if loop_count % 20 == 0: # Log every 20 iterations (approx every 2 seconds if sleep is 0.1s)
+        if loop_count % 5 == 0: # Log every 5 iterations (approx every 0.5 seconds if sleep is 0.1s)
             logger.info(f"\n--- LLM Prompt (Iteration {loop_count}) ---")
             logger.info(llm_prompt)
             logger.info("----------------------------------\n")
 
         # Optional: Check for critical battery (demonstrates using processed data)
+        # We now use the public getter on telemetry_processor or directly access latest_battery
         if telemetry_processor.is_battery_critical(CRITICAL_BATTERY_PERCENTAGE):
-            logger.warning(f"ALERT: Battery critical ({telemetry_processor._latest_battery.remaining_percent:.1f}%). LLM should prioritize landing.")
+            battery_percent = telemetry_processor._latest_battery.remaining_percent if telemetry_processor._latest_battery else 'N/A'
+            logger.warning(f"ALERT: Battery critical ({battery_percent}%). LLM should prioritize landing.")
 
         await asyncio.sleep(0.1) # Small delay to prevent busy-waiting and allow async tasks to run
 
