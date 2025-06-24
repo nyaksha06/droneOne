@@ -31,9 +31,28 @@ class LLMDecisionEngine:
                           {"action": "do_nothing"}
         """
         logger.info("Requesting action from LLM...")
+        augmented_prompt = (
+            f"{prompt_text}\n\n"
+            f"Based on this, respond ONLY with a JSON object that specifies the optimal drone action "
+            f"and any necessary parameters. Do not include any other text or explanation outside the JSON.\n"
+            f"The JSON object should conform to the following schema:\n"
+            f"```json\n"
+            f"{{\n"
+            f'  "action": "takeoff" | "land" | "goto_location" | "do_nothing",\n'
+            f'  "parameters": {{\n'
+            f'    "altitude_m"?: float,      // Required for "takeoff", "goto_location"\n'
+            f'    "latitude_deg"?: float,    // Required for "goto_location"\n'
+            f'    "longitude_deg"?: float    // Required for "goto_location"\n'
+            f'  }},\n'
+            f'  "reason"?: string           // Optional human-readable reason for the action\n'
+            f"}}\n"
+            f"```\n"
+            f"Ensure the JSON is well-formed and strictly follows this schema."
+        )
+
         payload = {
             "model": self.ollama_model_name,
-            "prompt": prompt_text,
+            "prompt": augmented_prompt,
             "stream": False # We want a single response
             # "options": {"temperature": 0.5, "num_predict": 128} # Example options
         }
@@ -54,9 +73,7 @@ class LLMDecisionEngine:
             llm_raw_response_text = result.get("response", "").strip()
             logger.info(f"LLM Raw Response: {llm_raw_response_text}")
 
-            # --- Simple Parsing Logic (will need refinement) ---
-            # This is a very basic example. In a real system, you'd use more robust parsing
-            # or ask the LLM to output strict JSON.
+            
             action = self._parse_llm_response(llm_raw_response_text)
             
             if not action:
@@ -78,42 +95,59 @@ class LLMDecisionEngine:
 
     def _parse_llm_response(self, response_text: str) -> dict:
         """
-        Parses the raw text response from the LLM into a structured dictionary.
-        This is a placeholder and will need significant development based on
-        how you train/prompt your LLM to format its output.
-        
-        For initial testing, let's assume the LLM provides simple commands.
+        Parses the raw text response from the LLM, assuming it is a strict JSON string.
+        This function will extract the JSON from a markdown block if present,
+        or attempt to parse the entire response as JSON.
         """
-        response_text = response_text.lower().strip()
+        try:
+            # Attempt to extract JSON from a markdown code block (common for LLMs)
+            if response_text.startswith("```json") and response_text.endswith("```"):
+                json_str = response_text.strip("```json").strip("```").strip()
+            elif response_text.startswith("```") and response_text.endswith("```"): # Generic code block
+                json_str = response_text.strip("```").strip()
+            else:
+                json_str = response_text # Assume it's directly JSON
 
-        if "takeoff" in response_text and "altitude" in response_text:
-            try:
-                # Example: "takeoff to altitude 10 meters"
-                parts = response_text.split("altitude")
-                alt_str = parts[1].split("meters")[0].strip()
-                altitude = float(alt_str)
-                return {"action": "takeoff", "altitude_m": altitude}
-            except (IndexError, ValueError):
-                return {"action": "takeoff", "altitude_m": 2.5} # Default if parse fails
-        elif "land" in response_text:
-            return {"action": "land"}
-        elif "go to" in response_text or "fly to" in response_text:
-            # Example: "go to lat 47.3976, lon 8.5456, alt 20"
-            try:
-                lat_match = [part for part in response_text.split("lat") if part]
-                lon_match = [part for part in response_text.split("lon") if part]
-                alt_match = [part for part in response_text.split("alt") if part]
-                
-                latitude = float(lat_match[0].split(',')[0].strip()) if lat_match else 0.0
-                longitude = float(lon_match[0].split(',')[0].strip()) if lon_match else 0.0
-                altitude = float(alt_match[0].split(',')[0].strip()) if alt_match else 10.0
-                
-                return {"action": "goto_location", "latitude_deg": latitude, "longitude_deg": longitude, "altitude_m": altitude}
-            except (IndexError, ValueError) as e:
-                logger.warning(f"Failed to parse goto coordinates: {e}. Response: {response_text}")
-                return {"action": "do_nothing", "reason": "goto_parse_error"}
-        elif "do nothing" in response_text or "wait" in response_text:
-            return {"action": "do_nothing"}
-        else:
-            return {} # Unrecognized command
+            parsed_json = json.loads(json_str)
+
+            # Basic validation of the parsed JSON
+            if not isinstance(parsed_json, dict):
+                logger.warning("LLM response is not a JSON object.")
+                return {}
+            if "action" not in parsed_json or not isinstance(parsed_json["action"], str):
+                logger.warning("JSON response missing 'action' key or it's not a string.")
+                return {}
+            
+            # Further validate action types and parameters
+            valid_actions = ["takeoff", "land", "goto_location", "do_nothing"]
+            if parsed_json["action"] not in valid_actions:
+                logger.warning(f"Invalid action '{parsed_json['action']}' returned by LLM.")
+                return {}
+
+            if parsed_json["action"] == "takeoff" and ("parameters" not in parsed_json or "altitude_m" not in parsed_json["parameters"]):
+                logger.warning("Takeoff action missing 'altitude_m' parameter. Providing default.")
+                parsed_json.setdefault("parameters", {})["altitude_m"] = 2.5 # Default altitude
+            
+            if parsed_json["action"] == "goto_location":
+                params = parsed_json.get("parameters", {})
+                if not all(k in params for k in ["latitude_deg", "longitude_deg", "altitude_m"]):
+                    logger.warning("Goto action missing required coordinates/altitude. Returning 'do_nothing'.")
+                    return {}
+                # Ensure types are correct
+                try:
+                    params["latitude_deg"] = float(params["latitude_deg"])
+                    params["longitude_deg"] = float(params["longitude_deg"])
+                    params["altitude_m"] = float(params["altitude_m"])
+                except ValueError:
+                    logger.warning("Goto parameters are not numbers. Returning 'do_nothing'.")
+                    return {}
+
+            return parsed_json
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse LLM response as JSON: {e}. Response: '{response_text}'")
+            return {}
+        except Exception as e:
+            logger.error(f"An unexpected error occurred during LLM response parsing: {e}. Response: '{response_text}'")
+            return {}
 
