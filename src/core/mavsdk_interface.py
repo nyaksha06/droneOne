@@ -140,7 +140,7 @@ class MAVSDKInterface:
         :param callback: An async function to call with the PositionVelocityNed data.
         """
         logger.info("Subscribing to Position and Velocity NED...")
-        async for pos_vel_ned in self.drone.telemetry.PositionVelocityNed():
+        async for pos_vel_ned in self.drone.telemetry.position_velocity_ned():
             await callback(pos_vel_ned)
 
     async def subscribe_position(self, callback):
