@@ -170,6 +170,14 @@ class MAVSDKInterface:
         async for battery_status in self.drone.telemetry.battery():
             await callback(battery_status)
 
+    async def subscribe_flight_mode(self, callback):
+        """
+        Subscribes to the drone's current flight mode.
+        :param callback: An async function to call with the FlightMode data.
+        """
+        logger.info("Subscribing to Flight Mode...")
+        async for flight_mode_status in self.drone.telemetry.flight_mode():
+            await callback(flight_mode_status) 
     async def disconnect(self):
         """
         Performs any necessary cleanup before exiting.

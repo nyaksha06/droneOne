@@ -42,23 +42,26 @@ async def main():
     # Callbacks to update TelemetryProcessor with raw MAVSDK data
     async def position_velocity_ned_handler(pos_vel_ned):
         await telemetry_processor.process_position_velocity_ned(pos_vel_ned)
-        
+    
+    async def global_position_handler(position):
+        pass 
+
     async def attitude_euler_handler(att_euler):
         await telemetry_processor.process_attitude_euler(att_euler)
 
     async def battery_handler(battery_status):
         await telemetry_processor.process_battery(battery_status)
 
-    async def flight_mode_handler(flight_mode):
-        drone_state.update_flight_mode(flight_mode.mode)
+    async def flight_mode_handler(flight_mode_status):
+        drone_state.update_flight_mode(flight_mode_status.mode)
 
 
     # Start MAVSDK telemetry subscriptions concurrently
     asyncio.ensure_future(mavsdk_interface.subscribe_position_velocity_ned(position_velocity_ned_handler))
+    asyncio.ensure_future(mavsdk_interface.subscribe_position(global_position_handler))
     asyncio.ensure_future(mavsdk_interface.subscribe_attitude_euler(attitude_euler_handler))
     asyncio.ensure_future(mavsdk_interface.subscribe_battery(battery_handler))
-    # PX4's telemetry.flight_mode() is also useful
-    asyncio.ensure_future(mavsdk_interface.drone.telemetry.flight_mode(flight_mode_handler))
+    asyncio.ensure_future(mavsdk_interface.subscribe_flight_mode(flight_mode_handler))
 
 
     # --- Main Loop for State Update and Prompt Generation ---
