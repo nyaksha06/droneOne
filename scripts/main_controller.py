@@ -162,9 +162,9 @@ async def main():
 
 
             # Optional: Check for critical battery 
-            if telemetry_processor.is_battery_critical(CRITICAL_BATTERY_PERCENTAGE):
-                battery_percent = telemetry_processor._latest_battery.remaining_percent if telemetry_processor._latest_battery else 'N/A'
-                logger.warning(f"ALERT: Battery critical ({battery_percent}%). LLM should prioritize landing.")
+            # if telemetry_processor.is_battery_critical(CRITICAL_BATTERY_PERCENTAGE):
+            #     battery_percent = telemetry_processor._latest_battery.remaining_percent if telemetry_processor._latest_battery else 'N/A'
+            #     logger.warning(f"ALERT: Battery critical ({battery_percent}%). LLM should prioritize landing.")
                 #  force a land if battery is critically low, overriding LLM and human
                 # await command_executor.execute_command({"action": "land", "reason": "Emergency: Critical Battery."})
 
