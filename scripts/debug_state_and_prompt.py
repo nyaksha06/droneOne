@@ -94,9 +94,9 @@ async def main():
 
         # Optional: Check for critical battery (demonstrates using processed data)
         # We now use the public getter on telemetry_processor or directly access latest_battery
-        if telemetry_processor.is_battery_critical(CRITICAL_BATTERY_PERCENTAGE):
-            battery_percent = telemetry_processor._latest_battery.remaining_percent if telemetry_processor._latest_battery else 'N/A'
-            logger.warning(f"ALERT: Battery critical ({battery_percent}%). LLM should prioritize landing.")
+        # if telemetry_processor.is_battery_critical(CRITICAL_BATTERY_PERCENTAGE):
+        #     battery_percent = telemetry_processor._latest_battery.remaining_percent if telemetry_processor._latest_battery else 'N/A'
+        #     logger.warning(f"ALERT: Battery critical ({battery_percent}%). LLM should prioritize landing.")
 
         await asyncio.sleep(0.1) # Small delay to prevent busy-waiting and allow async tasks to run
 
