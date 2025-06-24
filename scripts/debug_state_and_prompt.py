@@ -15,8 +15,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from src.core.mavsdk_interface import MAVSDKInterface
 from src.perception.telemetry_processor import TelemetryProcessor
 from src.perception.camera_processor import CameraProcessor
+from src.decision_making.llm_engine import LLMDecisionEngine
 from src.state_management.drone_state import DroneState
-from config.settings import SITL_SYSTEM_ADDRESS, CRITICAL_BATTERY_PERCENTAGE, DEFAULT_TAKEOFF_ALTITUDE_M
+from config.settings import SITL_SYSTEM_ADDRESS, CRITICAL_BATTERY_PERCENTAGE, DEFAULT_TAKEOFF_ALTITUDE_M, OLLAMA_API_URL, OLLAMA_MODEL_NAME 
 
 async def main():
     """
@@ -28,6 +29,7 @@ async def main():
     telemetry_processor = TelemetryProcessor()
     camera_processor = CameraProcessor()
     drone_state = DroneState()
+    llm_engine = LLMDecisionEngine(ollama_api_url=OLLAMA_API_URL, ollama_model_name=OLLAMA_MODEL_NAME)
 
     logger.info("Connecting to drone...")
     connected = await mavsdk_interface.connect()
@@ -90,6 +92,13 @@ async def main():
         if loop_count % 5 == 0: # Log every 5 iterations (approx every 0.5 seconds if sleep is 0.1s)
             logger.info(f"\n--- LLM Prompt (Iteration {loop_count}) ---")
             logger.info(llm_prompt)
+            
+            llm_recommended_action = await llm_engine.get_action_from_llm(llm_prompt)
+            logger.info(f"--- LLM Recommended Action ---")
+            logger.info(llm_recommended_action) 
+
+
+
             logger.info("----------------------------------\n")
 
         # Optional: Check for critical battery (demonstrates using processed data)
