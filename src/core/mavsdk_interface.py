@@ -151,6 +151,35 @@ class MAVSDKInterface:
             logger.error(f"Failed to land drone: {e}", exc_info=True)
             return False
 
+    async def goto(self,lat,long,alt,ext):
+        if not self.is_connected:
+            logger.warning("Drone not connected. Cannot takeoff.")
+            return False
+        
+        async for is_armed in self.drone.telemetry.armed():
+            if is_armed:
+                break
+            else:
+                await self.drone.action.arm()
+                
+        async for is_in_air in self.drone.telemetry.in_air():
+            if  is_in_air:
+                break
+            else:
+                await self.drone.action.set_takeoff_altitude(alt)
+                await self.drone.action.takeoff()    
+            
+
+        try:
+            await self.drone.action.goto_location(lat, long, alt, ext)
+            await asyncio.sleep(10)
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to land drone: {e}", exc_info=True)
+            return False
+        
+
     async def send_position_ned_setpoint(self, north_m: float, east_m: float, down_m: float, yaw_deg: float = 0.0):
         """
         Sends a position setpoint in NED frame for offboard control.

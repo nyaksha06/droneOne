@@ -50,9 +50,7 @@ class CommandExecutor:
                     latitude = float(latitude)
                     longitude = float(longitude)
                     altitude = float(altitude)
-                    # skipping  goto for now , it will require mode switching
-                    logger.warning("goto_location is not fully implemented for MAVSDK 1.3.0 API and needs careful testing.")
-                    logger.warning(f"Attempting to go to Lat: {latitude}, Lon: {longitude}, Alt: {altitude}")
+                    success = await self.mavsdk_interface.goto(latitude,longitude,altitude,0)
                     
                 else:
                     logger.error(f"Goto command missing required parameters: {parameters}")
