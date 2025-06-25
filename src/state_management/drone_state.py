@@ -101,13 +101,30 @@ class DroneState:
 
         # Construct the final prompt
         prompt = (
+            f"You are a highly precise drone control AI assistant. "
+            f"Your ONLY task is to output a single JSON object representing a drone command. "
+            f"You MUST NOT include any conversational text, explanations, or extraneous characters "
+            f" here is current drone state and mission statement output next step with appropriate parameters."
             f"Current Drone Status:\n"
             f"  - Flight Mode: {state.get('current_flight_mode')}\n"
             f"  - Telemetry: {telemetry_str}\n"
             f"  - Visual Insights: {visual_str}\n"
             f"  - Mission Objective: {state.get('mission_objectives')}\n\n"
             f"Based on this information, what is the optimal next action for the drone to achieve its mission?\n"
-            f"Provide a concise, actionable command in a structured format (e.g., 'fly to X,Y,Z' or 'land now')."
+            f'choose action from "takeoff" , "land" , "goto_location" , "do_nothing" only.\n'
+            f"The JSON object should conform to the following schema:\n"
+            f"```json\n"
+            f"{{\n"
+            f'  "action": "takeoff" | "land" | "goto_location" | "do_nothing",\n'
+            f'  "parameters": {{\n'
+            f'    "altitude_m"?: float,      // Required for "takeoff", "goto_location" (e.g., 10.0)\n'
+            f'    "latitude_deg"?: float,    // Required for "goto_location" (e.g., 47.3976)\n'
+            f'    "longitude_deg"?: float    // Required for "goto_location" (e.g., 8.5456)\n'
+            f'  }},\n'
+            f'  "reason"?: string           // Optional human-readable reason for the action\n'
+            f"}}\n"
+            f"```\n"
+            f"Ensure the JSON is well-formed and strictly follows this schema. Only output the JSON."
         )
         
         # logger.debug(f"Generated LLM Prompt:\n{prompt}")

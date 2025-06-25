@@ -31,34 +31,11 @@ class LLMDecisionEngine:
                           {"action": "do_nothing"}
         """
         logger.info("Requesting action from LLM...")
-        combined_prompt = (
-            "You are a highly precise drone control AI assistant. "
-            "Your ONLY task is to output a single JSON object representing a drone command. "
-            "You MUST NOT include any conversational text, explanations, or extraneous characters "
-            "outside of the JSON object itself. Adhere strictly to the provided JSON schema.\n\n"
-            
-            f"{prompt_text}\n\n"
-            
-            f"Based on this, respond ONLY with a JSON object that specifies the optimal drone action "
-            f"and any necessary parameters. The action must be one of: 'takeoff', 'land', 'goto_location', 'do_nothing'.\n"
-            f"The JSON object should conform to the following schema:\n"
-            f"```json\n"
-            f"{{\n"
-            f'  "action": "takeoff" | "land" | "goto_location" | "do_nothing",\n'
-            f'  "parameters": {{\n'
-            f'    "altitude_m"?: float,      // Required for "takeoff", "goto_location" (e.g., 10.0)\n'
-            f'    "latitude_deg"?: float,    // Required for "goto_location" (e.g., 47.3976)\n'
-            f'    "longitude_deg"?: float    // Required for "goto_location" (e.g., 8.5456)\n'
-            f'  }},\n'
-            f'  "reason"?: string           // Optional human-readable reason for the action\n'
-            f"}}\n"
-            f"```\n"
-            f"Ensure the JSON is well-formed and strictly follows this schema. Only output the JSON."
-        )
+       
 
         payload = {
             "model": self.ollama_model_name,
-            "prompt": combined_prompt,
+            "prompt": prompt_text,
             "stream": False 
         }
 

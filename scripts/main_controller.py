@@ -78,7 +78,7 @@ async def main():
         return
 
     # Set an initial mission objective for context
-    drone_state.set_mission_objectives("Perform a search pattern over the area in 30 m radius, identify any anomalies, and return to home.")
+    drone_state.set_mission_objectives("Tackoff up to 20m and land back and disarm.")
 
     # --- Telemetry Subscriptions and Processing ---
     async def position_velocity_ned_handler(pos_vel_ned):
