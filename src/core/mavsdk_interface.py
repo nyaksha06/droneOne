@@ -143,6 +143,7 @@ class MAVSDKInterface:
             while asyncio.get_event_loop().time() - start_time < timeout_seconds:
                 # --- FIX: Using the new _read_stream_value helper ---
                 in_air_status_obj = await self._read_stream_value(self.drone.telemetry.in_air, timeout=0.5)
+                print(in_air_status_obj)
                 if in_air_status_obj and in_air_status_obj.is_in_air:
                     logger.info("Drone is airborne! Now monitoring altitude.")
                     in_air_confirmed = True
