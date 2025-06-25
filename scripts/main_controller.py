@@ -110,7 +110,7 @@ async def main():
 
     logger.info("Starting main control loop.")
     llm_loop_count = 0 
-    main_loop_interval = 0.1 
+    main_loop_interval = 1
     llm_decision_interval_loops = 50 
 
     
