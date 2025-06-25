@@ -31,15 +31,14 @@ class LLMDecisionEngine:
                           {"action": "do_nothing"}
         """
         logger.info("Requesting action from LLM...")
-        system_message = (
+         combined_prompt = (
             "You are a highly precise drone control AI assistant. "
             "Your ONLY task is to output a single JSON object representing a drone command. "
             "You MUST NOT include any conversational text, explanations, or extraneous characters "
-            "outside of the JSON object itself. Adhere strictly to the provided JSON schema."
-        )
-
-        user_prompt_content = (
+            "outside of the JSON object itself. Adhere strictly to the provided JSON schema.\n\n"
+            
             f"{prompt_text}\n\n"
+            
             f"Based on this, respond ONLY with a JSON object that specifies the optimal drone action "
             f"and any necessary parameters. The action must be one of: 'takeoff', 'land', 'goto_location', 'do_nothing'.\n"
             f"The JSON object should conform to the following schema:\n"
@@ -59,16 +58,12 @@ class LLMDecisionEngine:
 
         payload = {
             "model": self.ollama_model_name,
-            "messages": [
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": user_prompt_content}
-            ],
-            "stream": False # We want a single response
+            "prompt": combined_prompt,
+            "stream": False 
         }
 
         try:
-            # Using loop.run_in_executor to make the blocking requests.post call non-blocking
-            # for the asyncio event loop.
+           
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 None, # Use default thread pool executor
