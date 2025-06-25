@@ -130,16 +130,6 @@ class MAVSDKInterface:
         try:
             await self.drone.action.set_takeoff_altitude(altitude_m)
             await self.drone.action.takeoff()
-
-            logger.info("Takeoff command sent. Waiting for drone to be airborne (checking in_air status)...")
-            in_air_confirmed = False
-            timeout_seconds = 15
-            start_time = asyncio.get_event_loop().time()
-
-            while asyncio.get_event_loop().time() - start_time < timeout_seconds:
-                async for is_in_air in self.drone.telemetry.in_air():
-                    if is_in_air:
-                        break
                 
             await asyncio.sleep(10)
         except Exception as e:
