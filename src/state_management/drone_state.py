@@ -53,7 +53,7 @@ class DroneState:
         # logger.debug(f"Flight mode updated to: {flight_mode}")
 
     def update_last_action(self, last_action: str):
-        self.update_last_action = last_action    
+        self._last_action = last_action    
 
     def get_current_state(self) -> dict:
         """
