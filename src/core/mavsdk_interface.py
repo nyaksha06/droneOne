@@ -105,8 +105,8 @@ class MAVSDKInterface:
             await self.drone.action.set_takeoff_altitude(altitude_m)
             await self.drone.action.takeoff()
             logger.info("Takeoff command sent. Monitoring altitude...")
-            async for altitude in self.drone.telemetry.altitude():
-                current_altitude = round(altitude.relative_altitude_m, 1)
+            async for position in self.drone.telemetry.position():
+                current_altitude = round(position.relative_altitude_m, 1)
                 logger.info(f"Current altitude: {current_altitude}m")
                 if current_altitude >= altitude_m * 0.95: # Within 95% of target
                     logger.info(f"Reached target altitude of approx {altitude_m}m.")
