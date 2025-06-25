@@ -107,46 +107,43 @@ class MAVSDKInterface:
 
             logger.info("Takeoff command sent. Waiting for drone to be airborne (checking in_air status)...")
             in_air_confirmed = False
-            timeout_seconds = 5
+            timeout_seconds = 15
             start_time = asyncio.get_event_loop().time()
 
             while asyncio.get_event_loop().time() - start_time < timeout_seconds:
-                try:
-                    current_in_air_status = (await self.drone.telemetry.in_air().read()).is_in_air
-                    if current_in_air_status:
-                        logger.info("Drone is airborne! Now monitoring altitude.")
-                        in_air_confirmed = True
-                        break
-                    else:
-                        logger.info("Drone not yet in air. Still waiting...")
-                except Exception as e:
-                    logger.warning(f"Error checking in_air status: {e}")
-                await asyncio.sleep(1.0)
+                in_air_status_obj = await self._read_stream_value(self.drone.telemetry.in_air, timeout=0.5)
+                if in_air_status_obj and in_air_status_obj.is_in_air:
+                    logger.info("Drone is airborne! Now monitoring altitude.")
+                    in_air_confirmed = True
+                    break
+                else:
+                    logger.info("Drone not yet in air. Still waiting for in_air status...")
+                await asyncio.sleep(0.5) # Poll less frequently to allow drone to respond
 
             if not in_air_confirmed:
                 logger.error("Drone did not report being in air within timeout. Aborting takeoff sequence.")
                 return False
 
-            logger.info("Giving telemetry a moment to update with meaningful altitude data...")
-            await asyncio.sleep(2.0)
+            logger.info("Giving telemetry a moment to update with meaningful altitude data after airborne confirmation...")
+            await asyncio.sleep(2.0) # Increased sleep to 2 seconds
 
             logger.info("Monitoring drone altitude to reach target...")
             altitude_reached = False
-            altitude_timeout_seconds = 25
+            altitude_timeout_seconds = 45
             start_altitude_monitor_time = asyncio.get_event_loop().time()
 
             while asyncio.get_event_loop().time() - start_altitude_monitor_time < altitude_timeout_seconds:
-                try:
-                    current_position = await self.drone.telemetry.position().read()
+                current_position = await self._read_stream_value(self.drone.telemetry.position, timeout=0.5)
+                if current_position:
                     current_altitude = round(current_position.relative_altitude_m, 1)
                     logger.info(f"Current altitude: {current_altitude}m (Target: {altitude_m}m)")
                     if current_altitude >= altitude_m * 0.95:
                         logger.info(f"Reached target altitude of approx {altitude_m}m.")
                         altitude_reached = True
                         break
-                except Exception as e:
-                    logger.warning(f"Error reading position telemetry for altitude check: {e}")
-                await asyncio.sleep(1.0)
+                else:
+                    logger.info("No position update received, still waiting for altitude data.")
+                await asyncio.sleep(0.5)
 
             if not altitude_reached:
                 logger.error("Drone did not reach target altitude within timeout. Consider mission failure.")
