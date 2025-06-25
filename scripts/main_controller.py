@@ -110,8 +110,8 @@ async def main():
 
     logger.info("Starting main control loop.")
     llm_loop_count = 0 
-    main_loop_interval = 1
-    llm_decision_interval_loops = 50 
+    main_loop_interval = 5
+    llm_decision_interval_loops = 1 
 
     
     current_llm_action = {"action": "do_nothing", "reason": "System startup, awaiting first LLM decision."}
