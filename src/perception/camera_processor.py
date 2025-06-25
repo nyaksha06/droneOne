@@ -28,7 +28,7 @@ class CameraProcessor:
         self._mock_object_counter += 1
         
         # Every 10 "frames" (or calls), simulate detecting a new object
-        if self._mock_object_counter % 10 == 0:
+        if self._mock_object_counter % 2 == 0:
             object_type = random.choice(["landing_pad", "obstacle", "person", "target_marker"])
             distance = round(random.uniform(2.0, 30.0), 1) # 2m to 30m
             relative_position = random.choice(["ahead_center", "ahead_left", "ahead_right", "below"])
