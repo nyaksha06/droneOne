@@ -31,7 +31,7 @@ class LLMDecisionEngine:
                           {"action": "do_nothing"}
         """
         logger.info("Requesting action from LLM...")
-         combined_prompt = (
+        combined_prompt = (
             "You are a highly precise drone control AI assistant. "
             "Your ONLY task is to output a single JSON object representing a drone command. "
             "You MUST NOT include any conversational text, explanations, or extraneous characters "
