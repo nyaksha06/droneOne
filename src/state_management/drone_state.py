@@ -16,6 +16,7 @@ class DroneState:
         self._visual_insights = {}
         self._mission_objectives = "No specific mission objective set."
         self._current_flight_mode = "UNKNOWN" 
+        self._last_action = "None"
 
         logger.info("DroneState initialized.")
 
@@ -51,11 +52,15 @@ class DroneState:
         self._current_flight_mode = flight_mode
         # logger.debug(f"Flight mode updated to: {flight_mode}")
 
+    def update_last_action(self, last_action: str):
+        self.update_last_action = last_action    
+
     def get_current_state(self) -> dict:
         """
         Returns the complete current state of the drone.
         """
         return {
+            "last_action": self._last_action,
             "telemetry": self._telemetry_data,
             "visual_insights": self._visual_insights,
             "mission_objectives": self._mission_objectives,
@@ -110,6 +115,7 @@ class DroneState:
             f"  - Telemetry: {telemetry_str}\n"
             f"  - Visual Insights: {visual_str}\n"
             f"  - Mission Objective: {state.get('mission_objectives')}\n\n"
+            f"  -Last Action: {self._last_action}"
             f"Based on this information, what is the optimal next action for the drone to achieve its mission?\n"
             f'choose action from "takeoff" , "land" , "goto_location" , "do_nothing" only.\n'
             f"The JSON object should conform to the following schema:\n"

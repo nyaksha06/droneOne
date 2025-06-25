@@ -135,11 +135,10 @@ async def main():
 
             # 2. Update central drone state
             processed_telemetry = telemetry_processor.get_processed_data()
-            print(processed_telemetry)
             visual_insights = camera_processor.get_visual_insights()
-            print(visual_insights)
             drone_state.update_telemetry(processed_telemetry)
             drone_state.update_visual_insights(visual_insights)
+            drone_state.update_last_action(current_llm_action["action"])
 
             # 3. Generate LLM prompt (only if LLM decision is needed this cycle)
             if llm_loop_count % llm_decision_interval_loops == 0:

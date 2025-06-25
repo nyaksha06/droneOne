@@ -137,9 +137,6 @@ class MAVSDKInterface:
             return False
 
     async def land(self):
-        """
-        Commands the drone to land at its current position.
-        """
         if not self.is_connected:
             logger.warning("Drone not connected. Cannot land.")
             return False
@@ -147,27 +144,7 @@ class MAVSDKInterface:
         logger.info("Landing drone...")
         try:
             await self.drone.action.land()
-            logger.info("Land command sent. Monitoring landing status...")
-            
-            on_ground_confirmed = False
-            timeout_seconds = 45
-            start_time = asyncio.get_event_loop().time()
-
-            while asyncio.get_event_loop().time() - start_time < timeout_seconds:
-                # --- FIX: Using the new _read_stream_value helper ---
-                in_air_status_obj = await self._read_stream_value(self.drone.telemetry.in_air, timeout=0.5)
-                if in_air_status_obj is not None and not in_air_status_obj.is_in_air: # Check for not None before accessing attribute
-                    logger.info("Drone has landed (no longer in air).")
-                    on_ground_confirmed = True
-                    break
-                else:
-                    logger.info("Drone still in air or status not received. Waiting to land...")
-                await asyncio.sleep(0.5) # Poll less frequently
-
-            if not on_ground_confirmed:
-                logger.error("Drone did not report being on ground within timeout. Landing sequence may not have completed.")
-                return False
-            
+            await asyncio.sleep(10)
             return True
             
         except Exception as e:
