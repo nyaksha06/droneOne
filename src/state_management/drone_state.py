@@ -123,9 +123,9 @@ class DroneState:
             f"{{\n"
             f'  "action": "takeoff" | "land" | "goto_location" | "do_nothing",\n'
             f'  "parameters": {{\n'
-            f'    "altitude_m"?: float,      // Required for "takeoff", "goto_location" (e.g., 10.0)\n'
-            f'    "latitude_deg"?: float,    // Required for "goto_location" (e.g., 47.3976)\n'
-            f'    "longitude_deg"?: float    // Required for "goto_location" (e.g., 8.5456)\n'
+            f'    "altitude_m"?: float,      // Required for "takeoff", "goto_location" (e.g.,20)\n'
+            f'    "north_dist"?: float,    // Required for "goto_location" (e.g., 5 )\n'
+            f'    "east_dist"?: float    // Required for "goto_location" (e.g., 7)\n'
             f'  }},\n'
             f'  "reason"?: string           // Optional human-readable reason for the action\n'
             f"}}\n"

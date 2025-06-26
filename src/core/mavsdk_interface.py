@@ -203,23 +203,21 @@ class MAVSDKInterface:
             logger.error(f"Failed to set HOLD mode: {e}")
             return False    
 
-    async def goto(self,latitude, longitude, relative_altitude):
-   
+    async def goto(self, north_m, east_m, down_m):
         print("-- Starting Offboard mode")
-    
-        await self.drone.offboard.set_position_global(
-            PositionGlobalYaw(
-                lat_deg=latitude,
-                lon_deg=longitude,
-                alt_m=relative_altitude,
-                yaw_deg=0.0,
-                altitude_type= AltitudeType.AGL
-            )
+
+        await self.drone.offboard.set_position_ned(
+        PositionNedYaw(
+            north_m=north_m,
+            east_m=east_m,
+            down_m=down_m,
+            yaw_deg=0.0
+        )
         )
 
         try:
             await self.drone.offboard.start()
-            print(f"-- Moving to (Lat: {latitude}, Lon: {longitude}, Alt: {relative_altitude}m)")
+            print(f"-- Moving to (North: {north_m}m, East: {east_m}m, Down: {down_m}m)")
         except OffboardError as error:
             print(f"Offboard start failed: {error._result.result}")
             await self.drone.action.disarm()
