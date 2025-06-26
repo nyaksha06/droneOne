@@ -209,11 +209,11 @@ class MAVSDKInterface:
     
         await self.drone.offboard.set_position_global(
             PositionGlobalYaw(
-                latitude_deg=latitude,
-                longitude_deg=longitude,
-                absolute_altitude_m=relative_altitude,
+                lat_deg=latitude,
+                lon_deg=longitude,
+                alt_m=relative_altitude,
                 yaw_deg=0.0,
-                is_altitude_relative=True
+                altitude_type= 2
             )
         )
 
@@ -233,7 +233,7 @@ class MAVSDKInterface:
         print("-- Landing")
         await self.drone.action.land()
         
-        
+
 
     async def send_position_ned_setpoint(self, north_m: float, east_m: float, down_m: float, yaw_deg: float = 0.0):
         """
