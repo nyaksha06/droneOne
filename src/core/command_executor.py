@@ -50,7 +50,7 @@ class CommandExecutor:
                     latitude = float(latitude)
                     longitude = float(longitude)
                     altitude = float(altitude)
-                    success = await self.mavsdk_interface.goto(latitude,longitude,altitude,0)
+                    success = await self.mavsdk_interface.goto(latitude,longitude,altitude)
                     
                 else:
                     logger.error(f"Goto command missing required parameters: {parameters}")

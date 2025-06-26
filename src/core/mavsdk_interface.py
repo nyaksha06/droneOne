@@ -1,6 +1,6 @@
 import asyncio
 from mavsdk import System
-from mavsdk.offboard import PositionNedYaw, OffboardError
+from mavsdk.offboard import PositionNedYaw, OffboardError,PositionGlobalYaw
 from mavsdk.action import ActionError
 from mavsdk.telemetry import FlightMode # Import for FlightMode
 import logging
@@ -150,34 +150,89 @@ class MAVSDKInterface:
         except Exception as e:
             logger.error(f"Failed to land drone: {e}", exc_info=True)
             return False
+        
 
-    async def goto(self,lat,long,alt,ext):
+    async def send_position_ned_setpoint(self, north_m: float, east_m: float, down_m: float, yaw_deg: float = 0.0):
+        """
+        Sends a position setpoint in NED frame for offboard control.
+        This must be called continuously at a high rate (e.g., 20-50Hz) when in Offboard mode.
+        """
+        try:
+            await self.drone.offboard.set_position_ned(
+                PositionNedYaw(north_m, east_m, down_m, yaw_deg)
+            )
+            # logger.debug(f"Sent NED setpoint: N={north_m}, E={east_m}, D={down_m}, Yaw={yaw_deg}")
+        except OffboardError as e:
+            logger.error(f"Failed to send OFFBOARD position setpoint: {e}")
+
+    async def set_offboard_mode(self) -> bool:
+        """
+        Sets the drone's flight mode to OFFBOARD.
+        Requires continuous setpoint streaming to maintain the mode.
+        """
         if not self.is_connected:
-            logger.warning("Drone not connected. Cannot takeoff.")
+            logger.warning("Drone not connected. Cannot set OFFBOARD mode.")
             return False
         
-        async for is_armed in self.drone.telemetry.armed():
-            if is_armed:
-                break
-            else:
-                await self.drone.action.arm()
-                
-        async for is_in_air in self.drone.telemetry.in_air():
-            if  is_in_air:
-                break
-            else:
-                await self.drone.action.set_takeoff_altitude(alt)
-                await self.drone.action.takeoff()    
-            
+        logger.info("Setting flight mode to OFFBOARD...")
+        try:
+            await self.drone.offboard.set_position_ned(
+                PositionNedYaw(0.0, 0.0, 0.0, 0.0) # Send a dummy setpoint first, as required by PX4 for OFFBOARD
+            )
+            await self.drone.offboard.start() # Start offboard mode
+            logger.info("OFFBOARD mode activated.")
+            return True
+        except OffboardError as e:
+            logger.error(f"Failed to set OFFBOARD mode: {e}")
+            return False
+
+    async def set_hold_mode(self) -> bool:
+        """
+        Sets the drone's flight mode to HOLD.
+        """
+        if not self.is_connected:
+            logger.warning("Drone not connected. Cannot set HOLD mode.")
+            return False
+
+        logger.info("Setting flight mode to HOLD...")
+        try:
+            await self.drone.action.hold()
+            logger.info("HOLD mode activated.")
+            return True
+        except ActionError as e:
+            logger.error(f"Failed to set HOLD mode: {e}")
+            return False    
+
+    async def goto(self,latitude, longitude, relative_altitude):
+   
+        print("-- Starting Offboard mode")
+    
+        await self.drone.offboard.set_position_global(
+            PositionGlobalYaw(
+                latitude_deg=latitude,
+                longitude_deg=longitude,
+                absolute_altitude_m=relative_altitude,
+                yaw_deg=0.0,
+                is_altitude_relative=True
+            )
+        )
 
         try:
-            await self.drone.action.goto_location(lat, long, alt, ext)
-            await asyncio.sleep(10)
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to land drone: {e}", exc_info=True)
-            return False
+            await self.drone.offboard.start()
+            print(f"-- Moving to (Lat: {latitude}, Lon: {longitude}, Alt: {relative_altitude}m)")
+        except OffboardError as error:
+            print(f"Offboard start failed: {error._result.result}")
+            await self.drone.action.disarm()
+            return
+
+        await asyncio.sleep(20)  
+
+        print("-- Stopping Offboard")
+        await self.drone.offboard.stop()
+
+        print("-- Landing")
+        await self.drone.action.land()
+        
         
 
     async def send_position_ned_setpoint(self, north_m: float, east_m: float, down_m: float, yaw_deg: float = 0.0):
