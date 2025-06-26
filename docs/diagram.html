@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Drone Control System Workflow & Modules</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            /* slate-50 */
+            color: #334155;
+            /* slate-700 */
+        }
+
+        .component {
+            transition: all 0.3s ease;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 0.5rem;
+            /* rounded-lg */
+            border-width: 2px;
+            border-style: solid;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 0.5rem;
+            font-weight: 600;
+            /* font-semibold */
+            position: relative;
+            /* For arrow positioning */
+            z-index: 10;
+            /* Ensure components are above arrows */
+        }
+
+        .component.active {
+            box-shadow: 0 0 0 4px #38bdf8, 0 8px 10px rgba(0, 0, 0, 0.2);
+            /* sky-400 */
+            transform: scale(1.02);
+            z-index: 20;
+            /* Bring active component further to front */
+        }
+
+        /* Component specific colors */
+        #human-interface {
+            background-color: #ecfdf5;
+            border-color: #34d399;
+            color: #065f46;
+        }
+
+        /* green-50, green-500, green-900 */
+        #telemetry-processor,
+        #camera-processor {
+            background-color: #eff6ff;
+            border-color: #60a5fa;
+            color: #1e40af;
+        }
+
+        /* blue-50, blue-400, blue-800 */
+        #state-manager {
+            background-color: #f3e8ff;
+            border-color: #a78bfa;
+            color: #5b21b6;
+        }
+
+        /* purple-50, purple-400, purple-800 */
+        #llm-engine {
+            background-color: #e0f2fe;
+            border-color: #38bdf8;
+            color: #0284c7;
+        }
+
+        /* sky-50, sky-400, sky-700 */
+        #command-arbitrator {
+            background-color: #fffbeb;
+            border-color: #fbbf24;
+            color: #b45309;
+        }
+
+        /* amber-50, amber-400, amber-800 */
+        #command-executor {
+            background-color: #fee2e2;
+            border-color: #ef4444;
+            color: #b91c1c;
+        }
+
+        /* red-50, red-500, red-800 */
+        #mavsdk-interface {
+            background-color: #e2e8f0;
+            border-color: #94a3b8;
+            color: #475569;
+        }
+
+        /* slate-200, slate-400, slate-700 */
+        #drone-hardware {
+            background-color: #cbd5e1;
+            border-color: #64748b;
+            color: #334155;
+        }
+
+        /* slate-300, slate-500, slate-700 */
+
+        /* .arrow-line {
+            position: absolute;
+            background-color: #64748b;
+            /* slate-500 */
+            
+            /* Below components, above background */
+        /* } */ 
+
+        /* .arrow-head {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-style: solid;
+        } */
+
+        /* Vertical arrow (down) */
+        /* .arrow-down .arrow-head {
+            border-width: 8px 6px 0 6px;
+            border-color: #64748b transparent transparent transparent;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* Horizontal arrow (right) */
+        /* .arrow-right .arrow-head {
+            border-width: 6px 0 6px 8px;
+            border-color: transparent transparent transparent #64748b;
+            right: -8px;
+            top: 50%;
+            transform: translateY(-50%);
+        } */ 
+
+        /* Vertical arrow (up) - for feedback from MAVSDK to Perception */
+        /* .arrow-up .arrow-head {
+            border-width: 0 6px 8px 6px;
+            border-color: transparent transparent #64748b transparent;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+        } */
+
+        /* Horizontal arrow (left) - for feedback to Telemetry Processor */
+        /* .arrow-left .arrow-head {
+            border-width: 6px 8px 6px 0;
+            border-color: transparent #64748b transparent transparent;
+            left: -8px;
+            top: 50%;
+            transform: translateY(-50%);
+        } */
+
+        #details-panel {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+        }
+
+        #details-panel.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1023px) {
+
+            /* On smaller screens, stack the diagram and details */
+            #diagram-container {
+                min-height: 800px;
+                /* Adjust height for stacked layout */
+                align-items: center;
+                justify-content: flex-start;
+                padding-top: 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="app-container" class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+          
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-slate-900">Drone Control System Workflow</h1>
+            <p class="mt-2 text-lg text-slate-600">Explore the modules and data flow for autonomous drone operations with human
+                override.</p>
+        </header>
+       
+
+        <main>
+            <div id="architecture" class="content-section">
+                
+
+                <div class="lg:grid lg:grid-cols-12 lg:gap-8 relative">
+                    <div id="diagram-container"
+                        class="lg:col-span-7 relative flex flex-col items-center p-4 min-h-[900px] lg:min-h-[850px]">
+
+                        <!-- Row 1: Human Interface -->
+                        <div id="human-interface" class="component w-56 h-20 mb-8" data-component="human_interface">
+                            <span>Human Interface Unit</span>
+                        </div>
+
+                        <!-- Row 2: Perception Units -->
+                        <div
+                            class="flex flex-col sm:flex-row space-y-8 sm:space-y-0 sm:space-x-8 mb-8 w-full justify-center">
+                            <div id="telemetry-processor" class="component w-48 h-20"
+                                data-component="telemetry_processor">
+                                <span>Telemetry Processor</span>
+                            </div>
+                            <div id="camera-processor" class="component w-48 h-20" data-component="camera_processor">
+                                <span>Camera Processor (Mock)</span>
+                            </div>
+                        </div>
+
+                        <!-- Row 3: State & Context Manager -->
+                        <div id="state-manager" class="component w-64 h-20 mb-8" data-component="state_manager">
+                            <span>State & Context Manager</span>
+                        </div>
+
+                        <!-- Row 4: LLM Decision Engine -->
+                        <div id="llm-engine" class="component w-64 h-20 mb-8" data-component="llm_engine">
+                            <span>LLM Decision Engine (Ollama)</span>
+                        </div>
+
+                        <!-- Row 5: Command Arbitration Logic -->
+                        <div id="command-arbitrator" class="component w-72 h-20 mb-8"
+                            data-component="command_arbitrator">
+                            <span>Command Arbitration Logic</span>
+                        </div>
+
+                        <!-- Row 6: Command Executor -->
+                        <div id="command-executor" class="component w-64 h-20 mb-8" data-component="command_executor">
+                            <span>Command Execution Unit</span>
+                        </div>
+
+                        <!-- Row 7: MAVSDK Interface -->
+                        <div id="mavsdk-interface" class="component w-64 h-20 mb-8" data-component="mavsdk_interface">
+                            <span>MAVSDK Interface</span>
+                        </div>
+
+                        <!-- Row 8: Drone Hardware -->
+                        <div id="drone-hardware" class="component w-48 h-20" data-component="drone_hardware">
+                            <span>Drone Hardware (SITL)</span>
+                        </div>
+
+                        <!-- Arrows will be drawn dynamically by JS -->
+                    </div>
+
+                    <div id="details-panel-container" class="lg:col-span-5 mt-8 lg:mt-0">
+                        <div id="details-panel" class="bg-white p-6 rounded-lg shadow-xl sticky lg:top-8"
+                            style="min-height: 300px;">
+                            <h3 id="details-title" class="text-xl font-bold text-slate-900 mb-2">Select a Component</h3>
+                            <p id="details-intro" class="text-slate-600 mb-4">Click on any block in the diagram to see
+                                its details here.</p>
+                            <div id="details-content"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const componentData = {
+            human_interface: {
+                title: 'Human Interface Unit',
+                intro: 'Allows a human operator to monitor the drone and issue manual commands, ensuring ultimate control.',
+                content: `
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Purpose:</h4>
+                    <p class="text-slate-600">To provide the essential human-in-the-loop capability, allowing for monitoring, manual control, and high-level command issuance.</p>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Key Functions:</h4>
+                    <ul class="list-disc list-inside text-slate-600 space-y-1">
+                       
+                        <li>Provide input for manual commands (e.g., 'land', 'disarm').</li>
+                        <li>Enable explicit release of control to LLM.</li>
+                    </ul>
+                    
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Next Steps :</h4>
+                     <ul class="list-disc list-inside text-slate-600 space-y-1">
+
+                        <li>Provide Total control to complete Mission.</li>
+                        
+                    </ul>
+                `
+            },
+            telemetry_processor: {
+                title: 'Telemetry Processor',
+                intro: 'Subscribes to raw MAVSDK telemetry streams, processes them, and extracts meaningful data about the drone\'s state.',
+                content: `
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Purpose:</h4>
+                    <p class="text-slate-600">To convert raw sensor data into structured, understandable information for the State & Context Manager.</p>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Key Functions:</h4>
+                    <ul class="list-disc list-inside text-slate-600 space-y-1">
+                        <li>Receives position, velocity, attitude, battery, etc.</li>
+                        <li>Determines current drone state (e.g., flying, on ground).</li>
+                    </ul>
+                     <h4 class="font-semibold mt-4 mb-2 text-slate-700">Output:</h4>
+                    <p class="text-slate-600 font-medium text-blue-600">Processed Telemetry Data</p>
+
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Next Step:</h4>
+                    <p class="text-slate-600 font-medium text-blue-600">Provide input to llm in different form, with specific fields</p>
+                `
+            },
+            camera_processor: {
+                title: 'Camera Processor (Mock)',
+                intro: 'Currently simulates visual detections, providing mock insights that a real camera system would generate.',
+                content: `
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Purpose:</h4>
+                    <p class="text-slate-600">To provide visual context and insights to the State & Context Manager, currently using simulated data.</p>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Key Functions:</h4>
+                    <ul class="list-disc list-inside text-slate-600 space-y-1">
+                        <li>(Mock) Generates random object detections (e.g., "landing_pad", "person").</li>
+                        
+                    </ul>
+                     <h4 class="font-semibold mt-4 mb-2 text-slate-700">Output:</h4>
+                    <p class="text-slate-600 font-medium text-blue-600">Structured Visual Insights</p>
+
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Next Step:</h4>
+                    <p class="text-slate-600 font-medium text-blue-600">Process live video frames using computer vision.</p>
+                `
+            },
+            state_manager: {
+                title: 'State & Context Manager',
+                intro: 'Aggregates all processed data from perception units and mission objectives into a unified, real-time understanding of the drone\'s situation.',
+                content: `
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Purpose:</h4>
+                    <p class="text-slate-600">To be the single source of truth for the drone's current operational state and to formulate a comprehensive prompt for the LLM.</p>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Key Functions:</h4>
+                    <ul class="list-disc list-inside text-slate-600 space-y-1">
+                        <li>Combines processed telemetry and visual insights.</li>
+                        <li>Tracks overall mission objectives and current mission stage.</li>
+                        <li>Generates the detailed textual prompt for the LLM.</li>
+                    </ul>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Output:</h4>
+                    <p class="text-slate-600 font-medium text-purple-600">Comprehensive Contextual Prompt</p>
+
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Next Step:</h4>
+                    <p class="text-slate-600 font-medium text-purple-600">Test with different Prompt Structure and figure out way to add current Mission state for better context.</p>
+                `
+            },
+            llm_engine: {
+                title: 'LLM Decision Engine (Ollama)',
+                intro: 'Communicates with the local Ollama LLM to generate high-level autonomous drone action recommendations.',
+                content: `
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Purpose:</h4>
+                    <p class="text-slate-600">To reason about the drone's current state and mission objectives, then propose an optimal next action.</p>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Key Functions:</h4>
+                    <ul class="list-disc list-inside text-slate-600 space-y-1">
+                        <li>Sends the contextual prompt to the Ollama API.</li>
+                        <li>Parses the structured (JSON) response from the LLM.</li>
+                        <li>Provides robust error handling for LLM communication.</li>
+                    </ul>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Output:</h4>
+                    <p class="text-slate-600 font-medium text-sky-600">LLM Recommended Autonomous Command</p>
+
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Next Step:</h4>
+                    <p class="text-slate-600 font-medium text-sky-600">To selsect better model and fine-tune specific to use case.</p>
+                    <p class="text-slate-600 font-medium text-sky-600">Responed to camea output. </p>
+
+                `
+            },
+            command_arbitrator: {
+                title: 'Command Arbitration Logic',
+                intro: 'The critical safety layer that decides which command to execute, prioritizing human commands over LLM-generated ones.',
+                content: `
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Purpose:</h4>
+                    <p class="text-slate-600">To ensure that human intervention always takes precedence, acting as the final gatekeeper for drone commands.</p>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Key Functions:</h4>
+                    <ul class="list-disc list-inside text-slate-600 space-y-1">
+                        <li>Receives commands from LLM Engine and Human Interface.</li>
+                        <li>Applies the priority rule: Human > LLM.</li>
+                        <li>Manages human override state (active/inactive).</li>
+                    </ul>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Output:</h4>
+                    <p class="text-slate-600 font-medium text-amber-600">Prioritized Drone Command</p>
+                `
+            },
+            command_executor: {
+                title: 'Command Execution Unit',
+                intro: 'Translates the prioritized command into specific MAVSDK API calls and sends them to the drone for execution.',
+                content: `
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Purpose:</h4>
+                    <p class="text-slate-600">To interface directly with the MAVSDK layer and convert high-level commands into low-level drone actions.</p>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Key Functions:</h4>
+                    <ul class="list-disc list-inside text-slate-600 space-y-1">
+                        <li>Executes actions like 'takeoff', 'land', 'disarm'.</li>
+                        <li>Translates 'goto_location' into appropriate MAVSDK calls for navigation.</li>
+                        <li>Handles MAVSDK-specific errors during command execution.</li>
+                    </ul>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Output:</h4>
+                    <p class="text-slate-600 font-medium text-red-600">MAVSDK API Calls</p>
+                    
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Next Steps:</h4>
+                    <p class="text-slate-600 font-medium text-red-600">Change Function to operate in offboard mode And add more fuction as per requirement.</p>
+
+                `
+            },
+            mavsdk_interface: {
+                title: 'MAVSDK Interface',
+                intro: 'The foundational communication layer directly interacting with the drone\'s flight controller (via SITL).',
+                content: `
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Purpose:</h4>
+                    <p class="text-slate-600">To provide the bridge between our software and the drone, handling raw data exchange and command dispatch.</p>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Key Functions:</h4>
+                    <ul class="list-disc list-inside text-slate-600 space-y-1">
+                        <li>Establishes and maintains connection to drone/SITL.</li>
+                        <li>Sends low-level commands (e.g., arm, takeoff, land, setpoints).</li>
+                        <li>Subscribes to and streams raw telemetry data.</li>
+                        <li>Provides robust takeoff/land monitoring for MAVSDK 1.3.0.</li>
+                    </ul>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Output:</h4>
+                    <p class="text-slate-600 font-medium text-gray-700">Raw Telemetry Data & Drone Actions</p>
+                `
+            },
+            drone_hardware: {
+                title: 'Drone Hardware (SITL)',
+                intro: 'The simulated drone running on Software-in-the-Loop (SITL), reacting to commands and providing sensor data.',
+                content: `
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Purpose:</h4>
+                    <p class="text-slate-600">To act as the physical drone for development and testing, providing realistic behavior without needing real hardware.</p>
+                    <h4 class="font-semibold mt-4 mb-2 text-slate-700">Components:</h4>
+                    <ul class="list-disc list-inside text-slate-600 space-y-1">
+                        <li>Flight Controller (PX4)</li>
+                        
+                    </ul>
+                `
+            },
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const components = document.querySelectorAll('.component');
+            const detailsPanel = document.getElementById('details-panel');
+            const detailsTitle = document.getElementById('details-title');
+            const detailsIntro = document.getElementById('details-intro');
+            const detailsContent = document.getElementById('details-content');
+            const diagramContainer = document.getElementById('diagram-container');
+
+            function calculateAndDrawArrows() {
+                // Clear existing arrows
+                diagramContainer.querySelectorAll('.arrow-line').forEach(arrow => arrow.remove());
+
+                const getOffset = (id) => {
+                    const el = document.getElementById(id);
+                    return {
+                        left: el.offsetLeft,
+                        top: el.offsetTop,
+                        width: el.offsetWidth,
+                        height: el.offsetHeight
+                    };
+                };
+
+                // Helper to draw a generic straight arrow (down, up, right, left)
+                const drawStraightArrow = (startElId, endElId, direction = 'down', type = 'single', offset = 0) => {
+                    const startEl = document.getElementById(startElId);
+                    const endEl = document.getElementById(endElId);
+                    if (!startEl || !endEl) return;
+
+                    const startOffset = getOffset(startElId);
+                    const endOffset = getOffset(endElId);
+
+                    let startX, startY, endX, endY;
+
+                    if (direction === 'down') {
+                        startX = startOffset.left + startOffset.width / 2 + offset;
+                        startY = startOffset.top + startOffset.height;
+                        endX = endOffset.left + endOffset.width / 2 + offset;
+                        endY = endOffset.top;
+                    } else if (direction === 'up') {
+                        startX = startOffset.left + startOffset.width / 2 + offset;
+                        startY = startOffset.top;
+                        endX = endOffset.left + endOffset.width / 2 + offset;
+                        endY = endOffset.top + endOffset.height;
+                    } else if (direction === 'right') {
+                        startX = startOffset.left + startOffset.width;
+                        startY = startOffset.top + startOffset.height / 2 + offset;
+                        endX = endOffset.left;
+                        endY = endOffset.top + endOffset.height / 2 + offset;
+                    } else if (direction === 'left') {
+                        startX = startOffset.left;
+                        startY = startOffset.top + startOffset.height / 2 + offset;
+                        endX = endOffset.left + endOffset.width;
+                        endY = endOffset.top + endOffset.height / 2 + offset;
+                    }
+
+                    const arrowDiv = document.createElement('div');
+                    arrowDiv.className = `arrow-line ${direction}`;
+                    arrowDiv.innerHTML = '<div class="arrow-head"></div>'; // Arrowhead
+
+                    if (direction === 'down' || direction === 'up') {
+                        arrowDiv.style.left = `${startX - 1}px`; // -1 for line thickness
+                        arrowDiv.style.top = `${Math.min(startY, endY)}px`;
+                        arrowDiv.style.height = `${Math.abs(endY - startY)}px`;
+                        arrowDiv.style.width = '2px';
+                    } else if (direction === 'right' || direction === 'left') {
+                        arrowDiv.style.left = `${Math.min(startX, endX)}px`;
+                        arrowDiv.style.top = `${startY - 1}px`;
+                        arrowDiv.style.width = `${Math.abs(endX - startX)}px`;
+                        arrowDiv.style.height = '2px';
+                    }
+
+                    diagramContainer.appendChild(arrowDiv);
+
+                    // For bidirectional arrows
+                    if (type === 'bidirectional') {
+                        const reverseDirection = { 'down': 'up', 'up': 'down', 'right': 'left', 'left': 'right' }[direction];
+                        const reverseOffset = -offset; // Reverse the offset for the opposite direction
+                        drawStraightArrow(endElId, startElId, reverseDirection, 'single', reverseOffset);
+                    }
+                };
+
+                // --- Specific function for the feedback loop (MAVSDK -> Perception) ---
+                const drawFeedbackLoop = () => {
+                    const mavsdkOffset = getOffset('mavsdk-interface');
+                    const telemetryOffset = getOffset('telemetry-processor');
+                    const cameraOffset = getOffset('camera-processor');
+
+                    const startX = mavsdkOffset.left + mavsdkOffset.width / 2;
+                    const startY = mavsdkOffset.top; // From top of MAVSDK
+
+                    const branchY = telemetryOffset.top - 30; // Y-level for horizontal branch above perception units
+
+                    // 1. Vertical line from MAVSDK top up to branchY
+                    let arrow = document.createElement('div');
+                    arrow.className = 'arrow-line arrow-up';
+                    arrow.innerHTML = '<div class="arrow-head"></div>';
+                    arrow.style.left = `${startX - 1}px`;
+                    arrow.style.top = `${branchY}px`;
+                    arrow.style.height = `${startY - branchY}px`;
+                    arrow.style.width = '2px';
+                    diagramContainer.appendChild(arrow);
+
+                    // 2. Horizontal line segment to Telemetry Processor
+                    arrow = document.createElement('div');
+                    arrow.className = 'arrow-line arrow-left'; // Arrowhead points left
+                    arrow.innerHTML = '<div class="arrow-head"></div>';
+                    arrow.style.left = `${telemetryOffset.left + telemetryOffset.width}px`;
+                    arrow.style.top = `${branchY - 1}px`;
+                    arrow.style.width = `${startX - (telemetryOffset.left + telemetryOffset.width)}px`;
+                    arrow.style.height = '2px';
+                    diagramContainer.appendChild(arrow);
+
+                    // 3. Horizontal line segment to Camera Processor
+                    arrow = document.createElement('div');
+                    arrow.className = 'arrow-line arrow-right'; // Arrowhead points right
+                    arrow.innerHTML = '<div class="arrow-head"></div>';
+                    arrow.style.left = `${startX}px`;
+                    arrow.style.top = `${branchY - 1}px`;
+                    arrow.style.width = `${cameraOffset.left - startX}px`;
+                    arrow.style.height = '2px';
+                    diagramContainer.appendChild(arrow);
+                };
+
+
+                // --- Drawing all connections ---
+
+                // Main control flow (top to bottom)
+                drawStraightArrow('human-interface', 'command-arbitrator', 'down', 'single', 40); // Human to Arbitrator (offset to the right)
+                drawStraightArrow('llm-engine', 'command-arbitrator', 'down', 'single', -40); // LLM to Arbitrator (offset to the left)
+                drawStraightArrow('command-arbitrator', 'command-executor', 'down');
+                drawStraightArrow('command-executor', 'mavsdk-interface', 'down');
+
+                // Perception flow
+                drawStraightArrow('telemetry-processor', 'state-manager', 'down', 'single', -30); // Telemetry to State
+                drawStraightArrow('camera-processor', 'state-manager', 'down', 'single', 30);    // Camera to State
+                drawStraightArrow('state-manager', 'llm-engine', 'down');
+
+                // Drone Hardware bidirectional with MAVSDK
+                drawStraightArrow('mavsdk-interface', 'drone-hardware', 'down', 'bidirectional');
+
+                // Feedback loop: MAVSDK Interface to Perception Units
+                drawFeedbackLoop();
+            }
+
+
+            function showDetails(componentId) {
+                const data = componentData[componentId];
+                if (!data) return;
+
+                components.forEach(c => c.classList.remove('active'));
+                document.querySelector(`.component[data-component="${componentId}"]`).classList.add('active');
+
+                detailsTitle.textContent = data.title;
+                detailsIntro.textContent = data.intro;
+                detailsContent.innerHTML = data.content;
+
+                detailsPanel.classList.remove('opacity-0', 'translate-y-4');
+                detailsPanel.classList.add('active'); // Add active class for transitions
+            }
+
+            components.forEach(component => {
+                component.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent click from bubbling to document
+                    const componentId = component.dataset.component;
+                    showDetails(componentId);
+                });
+            });
+
+            // Click anywhere outside a component or details panel to deselect
+            document.getElementById('app-container').addEventListener('click', (e) => {
+                if (!e.target.closest('.component') && !e.target.closest('#details-panel-container')) {
+                    components.forEach(c => c.classList.remove('active'));
+                    detailsPanel.classList.remove('active'); // Remove active class for transitions
+                    detailsPanel.classList.add('opacity-0', 'translate-y-4'); // Hide
+                    detailsTitle.textContent = 'Select a Component';
+                    detailsIntro.textContent = 'Click on any block in the diagram to see its details here.';
+                    detailsContent.innerHTML = '';
+                }
+            });
+            document.getElementById('details-panel-container').addEventListener('click', (e) => e.stopPropagation()); // Keep panel active on clicks within it
+
+            // Function to handle tab switching
+            function switchTab(targetId) {
+                const navItems = document.querySelectorAll('.nav-item');
+                const contentSections = document.querySelectorAll('.content-section');
+
+                contentSections.forEach(section => {
+                    section.classList.toggle('active', section.id === targetId);
+                });
+                navItems.forEach(item => {
+                    item.classList.toggle('active', item.dataset.target === targetId);
+                });
+
+                if (targetId === 'architecture') {
+                    // Re-draw arrows after DOM elements are potentially re-rendered by tab switch
+                    setTimeout(calculateAndDrawArrows, 100); // Small delay to ensure layout is stable
+                }
+            }
+
+            // Event listeners for navigation tabs
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    switchTab(item.dataset.target);
+                });
+            });
+
+            // Re-calculate arrows on window resize to ensure responsiveness
+            window.addEventListener('resize', calculateAndDrawArrows);
+
+            // Initial state: set 'architecture' tab as active and draw arrows
+            switchTab('architecture');
+            calculateAndDrawArrows(); // Initial draw
+        });
+    </script>
+</body>
+
+</html>
