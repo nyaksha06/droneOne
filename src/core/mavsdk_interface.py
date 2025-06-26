@@ -1,6 +1,6 @@
 import asyncio
 from mavsdk import System
-from mavsdk.offboard import PositionNedYaw, OffboardError,PositionGlobalYaw,AltitudeType
+from mavsdk.offboard import PositionNedYaw, OffboardError
 from mavsdk.action import ActionError
 from mavsdk.telemetry import FlightMode # Import for FlightMode
 import logging
