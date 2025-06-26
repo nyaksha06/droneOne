@@ -111,13 +111,13 @@ class LLMDecisionEngine:
             
             if parsed_json["action"] == "goto_location":
                 params = parsed_json.get("parameters", {})
-                if not all(k in params for k in ["latitude_deg", "longitude_deg", "altitude_m"]):
+                if not all(k in params for k in ["east_dist", "north_dist", "altitude_m"]):
                     logger.warning("Goto action missing required coordinates/altitude. Returning 'do_nothing'.")
                     return {}
                 # Ensure types are correct
                 try:
-                    params["latitude_deg"] = float(params["latitude_deg"])
-                    params["longitude_deg"] = float(params["longitude_deg"])
+                    params["latitude_deg"] = float(params["east_dist"])
+                    params["longitude_deg"] = float(params["north_dist"])
                     params["altitude_m"] = float(params["altitude_m"])
                 except ValueError:
                     logger.warning("Goto parameters are not numbers. Returning 'do_nothing'.")
