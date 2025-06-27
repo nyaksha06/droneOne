@@ -305,7 +305,7 @@ class MAVSDKInterface:
         # 3. Set initial setpoint before starting offboard mode
         print("-- Setting initial offboard setpoint (hover)")
         await self.drone.offboard.set_velocity_body(VelocityBodyYawspeed(0.0, 0.0, 0.0, 0.0))
-        await asyncio.sleep(1) # Give it a moment to receive the setpoint
+        
 
         # 4. Start offboard mode
         print("-- Starting offboard mode")

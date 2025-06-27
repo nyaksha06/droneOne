@@ -49,8 +49,6 @@ async def main():
         try:
             await mavsdk_interface.drone.offboard.stop()
             print("-- Offboard stopped.")
-            # After stopping offboard, the drone will typically enter HOLD mode.
-            # You can then command it to land or return to launch.
             print("-- Commanding drone to land...")
             await mavsdk_interface.drone.action.land()
             print("-- Land command sent. Disarming when landed...")
