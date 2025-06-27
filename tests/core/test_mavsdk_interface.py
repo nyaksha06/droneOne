@@ -1,10 +1,14 @@
 import asyncio
+import os
 from mavsdk import System
 from mavsdk.offboard import PositionNedYaw, OffboardError, VelocityBodyYawspeed
 from mavsdk.action import ActionError
 from mavsdk.telemetry import FlightMode 
 import logging
 import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 from config.settings import SITL_SYSTEM_ADDRESS, CRITICAL_BATTERY_PERCENTAGE, OLLAMA_API_URL, OLLAMA_MODEL_NAME
 from src.core.mavsdk_interface import MAVSDKInterface
 
