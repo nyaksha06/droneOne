@@ -1,0 +1,28 @@
+{
+  "position": {
+    "latitude_deg": 47.397750699999996,
+    "longitude_deg": 8.5456073,
+    "relative_altitude_m": -0.0020000000949949026
+  },
+  "velocity_ned": {
+    "north_m_s": 0.0,
+    "east_m_s": -0.009999999776482582,
+    "down_m_s": 0.009999999776482582
+  },
+  "attitude_euler": {
+    "roll_deg": -0.03047315403819084,
+    "pitch_deg": 0.2621116042137146,
+    "yaw_deg": 88.90653991699219
+  },
+  "battery": {
+    "remaining_percent": 100,
+    "voltage_v": 16.2
+  },
+  "flight_mode": "HOLD",
+  "gps_info": {
+    "num_satellites": 10,
+    "fix_type": 3
+  },
+ "in_air": false,
+  "armed": false
+}
