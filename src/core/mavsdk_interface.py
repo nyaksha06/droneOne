@@ -329,8 +329,8 @@ class MAVSDKInterface:
         altitude_achieved = False
         altitude_tolerance = 0.2
         print("Monitoring altitude...")
-        async for position_ned in self.drone.telemetry.position_ned():
-            current_down_m = position_ned.down_m
+        async for position_info in self.drone.telemetry.position():
+            current_down_m = position_info.altitude()
             print(f"Current altitude (NED Down): {current_down_m:.2f}m")
 
             if abs(current_down_m - target_down_m) < altitude_tolerance:
