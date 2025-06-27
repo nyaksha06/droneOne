@@ -1,17 +1,17 @@
 import asyncio
 from mavsdk import System
-from mavsdk.offboard import PositionNedYaw, OffboardError
+from mavsdk.offboard import PositionNedYaw, OffboardError, VelocityBodyYawspeed
 from mavsdk.action import ActionError
-from mavsdk.telemetry import FlightMode # Import for FlightMode
+from mavsdk.telemetry import FlightMode 
 import logging
 import sys
 
-# Configure general logging for our application
+
 logging.basicConfig(level=logging.INFO, stream=sys.stdout,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# --- Alternative for mavsdk.log_level: Configure MAVSDK's internal logger directly ---
+
 mavsdk_logger = logging.getLogger("mavsdk")
 mavsdk_logger.setLevel(logging.INFO)
 
@@ -33,10 +33,6 @@ class MAVSDKInterface:
         logger.info(f"MAVSDKInterface initialized for system address: {self._system_address}")
 
     async def _read_stream_value(self, stream_func, timeout=1.0):
-        """
-        Helper function to safely read the next (latest) value from an async MAVSDK stream
-        for MAVSDK 1.3.0, which lacks a .read() method.
-        """
         try:
             # Get the async iterator from the stream function (e.g., self.drone.telemetry.in_air())
             # and await its next value.
@@ -232,57 +228,6 @@ class MAVSDKInterface:
         await self.drone.action.land()
         
 
-
-    async def send_position_ned_setpoint(self, north_m: float, east_m: float, down_m: float, yaw_deg: float = 0.0):
-        """
-        Sends a position setpoint in NED frame for offboard control.
-        This must be called continuously at a high rate (e.g., 20-50Hz) when in Offboard mode.
-        """
-        try:
-            await self.drone.offboard.set_position_ned(
-                PositionNedYaw(north_m, east_m, down_m, yaw_deg)
-            )
-        except OffboardError as e:
-            logger.error(f"Failed to send OFFBOARD position setpoint: {e}")
-
-    async def set_offboard_mode(self) -> bool:
-        """
-        Sets the drone's flight mode to OFFBOARD.
-        Requires continuous setpoint streaming to maintain the mode.
-        """
-        if not self.is_connected:
-            logger.warning("Drone not connected. Cannot set OFFBOARD mode.")
-            return False
-        
-        logger.info("Setting flight mode to OFFBOARD...")
-        try:
-            await self.drone.offboard.set_position_ned(
-                PositionNedYaw(0.0, 0.0, 0.0, 0.0) # Send a dummy setpoint first, as required by PX4 for OFFBOARD
-            )
-            await self.drone.offboard.start() # Start offboard mode
-            logger.info("OFFBOARD mode activated.")
-            return True
-        except OffboardError as e:
-            logger.error(f"Failed to set OFFBOARD mode: {e}")
-            return False
-
-    async def set_hold_mode(self) -> bool:
-        """
-        Sets the drone's flight mode to HOLD.
-        """
-        if not self.is_connected:
-            logger.warning("Drone not connected. Cannot set HOLD mode.")
-            return False
-
-        logger.info("Setting flight mode to HOLD...")
-        try:
-            await self.drone.action.hold()
-            logger.info("HOLD mode activated.")
-            return True
-        except ActionError as e:
-            logger.error(f"Failed to set HOLD mode: {e}")
-            return False
-
     async def subscribe_position_velocity_ned(self, callback):
         """
         Subscribes to position and velocity NED data.
@@ -336,4 +281,74 @@ class MAVSDKInterface:
         logger.info("Disconnecting MAVSDK...")
         self.is_connected = False
         logger.info("MAVSDK interface shut down.")
+
+    async def offboard_takeoff(self, target_altitude_m: float = 10.0):
+
+        print(f"--- Starting offboard take-off to {target_altitude_m} meters ---")
+
+        # 1. Check for global position estimate (crucial for position control)
+        print("Waiting for drone to have a global position estimate...")
+        async for health in self.drone.telemetry.health():
+            if health.is_global_position_ok and health.is_home_position_ok:
+                print("-- Global position estimate OK")
+                break
+
+        # 2. Arm the drone
+        print("-- Arming drone")
+        try:
+            await self.drone.action.arm()
+            print("-- Drone armed successfully!")
+        except Exception as e:
+            print(f"Error arming drone: {e}")
+            return False # Indicate failure
+
+        # 3. Set initial setpoint before starting offboard mode
+        print("-- Setting initial offboard setpoint (hover)")
+        await self.drone.offboard.set_velocity_body(VelocityBodyYawspeed(0.0, 0.0, 0.0, 0.0))
+        await asyncio.sleep(1) # Give it a moment to receive the setpoint
+
+        # 4. Start offboard mode
+        print("-- Starting offboard mode")
+        try:
+            await self.drone.offboard.start()
+            print("-- Offboard mode started!")
+        except OffboardError as error:
+            print(f"Error starting offboard mode: {error._result.result}")
+            # If offboard start fails, disarm and return False
+            print("-- Disarming drone due to offboard start failure.")
+            await self.drone.action.disarm()
+            return False # Indicate failure
+
+        # 5. Command take-off to target altitude
+        target_down_m = -abs(target_altitude_m) 
+
+        print(f"-- Commanding take-off to altitude: {target_altitude_m}m (NED Down: {target_down_m}m)")
+        await self.drone.offboard.set_position_ned(PositionNedYaw(0.0, 0.0, target_down_m, 0.0))
+
+        # 6. Monitor altitude until target is reached
+        altitude_achieved = False
+        altitude_tolerance = 0.2
+        print("Monitoring altitude...")
+        async for position_ned in self.drone.telemetry.position_ned():
+            current_down_m = position_ned.down_m
+            print(f"Current altitude (NED Down): {current_down_m:.2f}m")
+
+            if abs(current_down_m - target_down_m) < altitude_tolerance:
+                print(f"-- Reached target altitude of {target_altitude_m}m!")
+                altitude_achieved = True
+                break
+
+            await asyncio.sleep(0.1) 
+
+        if altitude_achieved:
+            print("--- Take-off successful! Drone is in Offboard mode at target altitude. ---")
+            return True 
+        else:
+            print("--- Take-off failed: Did not reach target altitude. ---")
+            try:
+                await self.drone.offboard.stop()
+                print("-- Offboard stopped after failed take-off.")
+            except OffboardError:
+                pass 
+            return False     
 
