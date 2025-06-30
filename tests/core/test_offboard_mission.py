@@ -125,23 +125,13 @@ class DroneController:
 
         print("Monitoring position until target is reached...")
         # **** IMPORTANT CHANGE HERE: Subscribe to position_velocity_ned() ****
-        async for current_telemetry_pv_info in self.drone.telemetry.position_velocity_ned(rate_hz=10.0):
+        async for current_telemetry_pv_info in self.drone.telemetry.position_velocity_ned():
             # Exit loop if timeout reached (check only when new telemetry arrives)
             if (asyncio.get_event_loop().time() - start_time) > goto_timeout_seconds:
                 print(f"--- GOTO failed: Did not reach target position within {goto_timeout_seconds}s. ---")
                 return False # Exit the function, GOTO failed
             
-            # Continuously send the position AND velocity setpoint
-            await self.drone.offboard.set_position_velocity_ned(
-                # Corrected: Pass arguments positionally, not as keywords
-                target_position.north_m,
-                target_position.east_m,
-                target_position.down_m,
-                target_velocity.north_m_s,
-                target_velocity.east_m_s,
-                target_velocity.down_m_s,
-                target_position.yaw_deg 
-            )
+           
 
             # **** Accessing north_m, east_m, down_m from the nested position object ****
             current_north_m = current_telemetry_pv_info.position.north_m
@@ -159,15 +149,12 @@ class DroneController:
                 position_reached = True
                 break
 
-            await asyncio.sleep(0.1) # Continue sending setpoints/monitoring
+            await asyncio.sleep(0.1) 
 
         if position_reached:
             print("--- GOTO successful! Drone is at target position. ---")
             return True
         else:
-            # If loop finished due to timeout (and position_reached is False),
-            # the return False would have already happened inside the loop.
-            # This part is for explicit fall-through if needed, but the loop exit handles it.
             return False
 
     # **** MODIFIED HOLD FUNCTION ****
