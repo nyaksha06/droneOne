@@ -106,12 +106,24 @@ class DroneController:
         Returns True on success, False on failure.
         """
         print(f"--- Commanding drone to GOTO N:{north_m:.2f}m, E:{east_m:.2f}m, D:{down_m:.2f}m with Yaw:{yaw_deg:.2f}deg ---")
+        
+        await self.drone.offboard.set_position_ned(
+        PositionNedYaw(
+            north_m=north_m,
+            east_m=east_m,
+            down_m=down_m,
+            yaw_deg=0.0
+        )
+        )
 
         try:
             await self.drone.offboard.start()
-            print("-- Offboard mode ensured/started for GOTO.")
-        except OffboardError:
-            pass
+            print(f"-- Moving to (North: {north_m}m, East: {east_m}m, Down: {down_m}m)")
+        except OffboardError as error:
+            print(f"Offboard start failed: {error._result.result}")
+            await self.drone.action.disarm()
+            return
+        
 
         target_position = PositionNedYaw(north_m, east_m, down_m, yaw_deg)
         target_velocity = VelocityNedYaw(0.0, 0.0, 0.0, 0.0) 
