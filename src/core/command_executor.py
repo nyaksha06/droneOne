@@ -39,7 +39,7 @@ class CommandExecutor:
         try:
             if action_type == "takeoff":
                 altitude = parameters.get("altitude_m", 2.5) 
-                success = await self.mavsdk_interface.arm() and await self.mavsdk_interface.takeoff(altitude)
+                success = await self.mavsdk_interface.arm() and await self.mavsdk_interface.offboard_takeoff(altitude)
             elif action_type == "land":
                 success = await self.mavsdk_interface.land()
             elif action_type == "goto_location":
@@ -50,7 +50,7 @@ class CommandExecutor:
                     latitude = int(latitude)
                     longitude = int(longitude)
                     altitude = -1*int(altitude)
-                    success = await self.mavsdk_interface.goto(latitude,longitude,altitude)
+                    success = await self.mavsdk_interface.offboard_goto(latitude,longitude,altitude)
                     
                 else:
                     logger.error(f"Goto command missing required parameters: {parameters}")
@@ -58,7 +58,7 @@ class CommandExecutor:
             elif action_type == "do_nothing":
                 logger.info("Command is 'do_nothing'. Drone maintains current state.")
                 success = True
-            elif action_type == "disarm": # Added for human override testing
+            elif action_type == "disarm": 
                 success = await self.mavsdk_interface.disarm()
             else:
                 logger.warning(f"Unknown command type received: {action_type}. Doing nothing.")

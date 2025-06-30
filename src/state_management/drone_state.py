@@ -117,11 +117,12 @@ class DroneState:
             f"  - Mission Objective: {state.get('mission_objectives')}\n\n"
             f"  -Last Action: {self._last_action}"
             f"Based on this information, what is the optimal next action for the drone to achieve its mission?\n"
-            f'choose action from "takeoff" , "land" , "goto_location" , "do_nothing" only.\n'
+            f'choose action from "takeoff" , "land" , "goto_location"  only.\n'
+            f'see last action and mission statement to decide next step.\n'
             f"The JSON object should conform to the following schema:\n"
             f"```json\n"
             f"{{\n"
-            f'  "action": "takeoff" | "land" | "goto_location" | "do_nothing",\n'
+            f'  "action": "takeoff"  | "goto" | "land" ,\n'
             f'  "parameters": {{\n'
             f'    "altitude_m"?: float,      // Required for "takeoff", "goto_location" (e.g.,20)\n'
             f'    "north_dist"?: float,    // Required for "goto_location" (e.g., 5 )\n'

@@ -1,6 +1,6 @@
 import asyncio
 from mavsdk import System
-from mavsdk.offboard import PositionNedYaw, OffboardError, VelocityBodyYawspeed
+from mavsdk.offboard import PositionNedYaw, OffboardError, VelocityBodyYawspeed,VelocityNedYaw
 from mavsdk.action import ActionError
 from mavsdk.telemetry import FlightMode 
 import logging
@@ -19,7 +19,7 @@ class MAVSDKInterface:
     """
     Manages all interactions with the drone via MAVSDK.
     Provides methods for connection, arming, taking off, landing,
-    and subscribing to telemetry streams, and now offboard control.
+    and subscribing to telemetry streams, and offboard control.
     """
 
     def __init__(self, system_address: str = "udp://:14540"):
@@ -132,19 +132,25 @@ class MAVSDKInterface:
             logger.error(f"Failed to takeoff: {e}", exc_info=True)
             return False
 
-    async def land(self):
-        if not self.is_connected:
-            logger.warning("Drone not connected. Cannot land.")
-            return False
-
-        logger.info("Landing drone...")
+    async def land(self) -> bool:
+        
+        print("--- Commanding drone to LAND ---")
         try:
             await self.drone.action.land()
-            await asyncio.sleep(10)
-            return True
-            
+            print("-- Landing command sent.")
+
+            print("Waiting for drone to land and disarm...")
+            async for is_armed in self.drone.telemetry.armed():
+                if is_armed:
+                    pass
+                else:
+                    print("Drone is DISARMED")
+                    break
+                await asyncio.sleep(1) 
+            return True 
+
         except Exception as e:
-            logger.error(f"Failed to land drone: {e}", exc_info=True)
+            print(f"Error during landing: {e}")
             return False
         
 
@@ -282,8 +288,7 @@ class MAVSDKInterface:
         self.is_connected = False
         logger.info("MAVSDK interface shut down.")
 
-    async def offboard_takeoff(self, target_altitude_m: float = 10.0):
-
+    async def offboard_takeoff(self, target_altitude_m: float = 10.0) -> bool:
         print(f"--- Starting offboard take-off to {target_altitude_m} meters ---")
 
         # 1. Check for global position estimate (crucial for position control)
@@ -300,13 +305,14 @@ class MAVSDKInterface:
             print("-- Drone armed successfully!")
         except Exception as e:
             print(f"Error arming drone: {e}")
-            return False # Indicate failure
+            return False 
 
         # 3. Set initial setpoint before starting offboard mode
         print("-- Setting initial offboard setpoint (hover)")
-        await self.drone.offboard.set_velocity_body(VelocityBodyYawspeed(0.0, 0.0, 0.0, 0.0))
+        for _ in range(10):
+            await self.drone.offboard.set_velocity_body(VelocityBodyYawspeed(0.0, 0.0, 0.0, 0.0))
+            await asyncio.sleep(0.005) 
         
-
         # 4. Start offboard mode
         print("-- Starting offboard mode")
         try:
@@ -314,23 +320,39 @@ class MAVSDKInterface:
             print("-- Offboard mode started!")
         except OffboardError as error:
             print(f"Error starting offboard mode: {error._result.result}")
-            # If offboard start fails, disarm and return False
             print("-- Disarming drone due to offboard start failure.")
             await self.drone.action.disarm()
-            return False # Indicate failure
+            return False 
 
         # 5. Command take-off to target altitude
         target_down_m = -abs(target_altitude_m) 
 
         print(f"-- Commanding take-off to altitude: {target_altitude_m}m (NED Down: {target_down_m}m)")
-        await self.drone.offboard.set_position_ned(PositionNedYaw(0.0, 0.0, target_down_m, 0.0))
+        
+        initial_position = None
+        async for pos in self.drone.telemetry.position():
+            initial_position = pos
+            break 
 
-        # 6. Monitor altitude until target is reached
+        if initial_position is None:
+            print("Error: Could not get initial position for take-off monitoring.")
+            await self.drone.offboard.stop()
+            await self.drone.action.disarm()
+            return False
+
         altitude_achieved = False
-        altitude_tolerance = 0.2
-        print("Monitoring altitude...")
-        async for position_info in self.drone.telemetry.position():
-            current_down_m = position_info.relative_altitude_m
+        altitude_tolerance = 0.1
+        print("Monitoring altitude for take-off...")
+        
+        timeout_seconds = 60 
+        start_time = asyncio.get_event_loop().time()
+
+        while not altitude_achieved and (asyncio.get_event_loop().time() - start_time) < timeout_seconds:
+            await self.drone.offboard.set_position_ned(PositionNedYaw(0.0, 0.0, target_down_m, 0.0))
+            
+            current_position = await self.drone.telemetry.position().__anext__() 
+            current_down_m = current_position.relative_altitude_m
+            
             print(f"Current altitude (NED Down): {current_down_m:.2f}m")
 
             if abs(current_down_m + target_down_m) < altitude_tolerance:
@@ -341,14 +363,91 @@ class MAVSDKInterface:
             await asyncio.sleep(0.1) 
 
         if altitude_achieved:
-            print("--- Take-off successful! Drone is in Offboard mode at target altitude. ---")
+            print("--- Take-off successful!  ---")
+            self.hold_position_indefinitely()
             return True 
         else:
-            print("--- Take-off failed: Did not reach target altitude. ---")
+            print(f"--- Take-off failed: Did not reach target altitude within {timeout_seconds}s. ---")
+            self.hold_position_indefinitely()
             try:
-                await self.drone.offboard.stop()
+                
                 print("-- Offboard stopped after failed take-off.")
             except OffboardError:
                 pass 
             return False     
 
+    async def offboard_goto(self, north_m: float, east_m: float, down_m: float, yaw_deg: float = 0.0) -> bool:
+        print(f"--- Commanding drone to GOTO N:{north_m:.2f}m, E:{east_m:.2f}m, D:{down_m:.2f}m with Yaw:{yaw_deg:.2f}deg ---")
+        
+        await self.drone.offboard.set_position_ned(
+        PositionNedYaw(
+            north_m=north_m,
+            east_m=east_m,
+            down_m=down_m,
+            yaw_deg=0.0
+        )
+        )
+
+        try:
+            await self.drone.offboard.start()
+            print(f"-- Moving to (North: {north_m}m, East: {east_m}m, Down: {down_m}m)")
+        except OffboardError as error:
+            print(f"Offboard start failed: {error._result.result}")
+            await self.drone.action.disarm()
+            return
+        
+
+        target_position = PositionNedYaw(north_m, east_m, down_m, yaw_deg)
+        target_velocity = VelocityNedYaw(0.0, 0.0, 0.0, 0.0) 
+
+        position_reached = False
+        position_tolerance_xy = 0.1
+        position_tolerance_z = 0.1  
+        
+        goto_timeout_seconds = 120 
+        start_time = asyncio.get_event_loop().time()
+
+        print("Monitoring position until target is reached...")
+        async for current_telemetry_pv_info in self.drone.telemetry.position_velocity_ned():
+            if (asyncio.get_event_loop().time() - start_time) > goto_timeout_seconds:
+                print(f"--- GOTO failed: Did not reach target position within {goto_timeout_seconds}s. ---")
+                return False 
+            
+           
+
+            
+            current_north_m = current_telemetry_pv_info.position.north_m
+            current_east_m = current_telemetry_pv_info.position.east_m
+            current_down_m = current_telemetry_pv_info.position.down_m 
+
+            distance_xy = ((current_north_m - north_m)**2 + (current_east_m - east_m)**2)**0.5
+            distance_z = abs(current_down_m - down_m) 
+
+            print(f"Current Pos (N,E,D): ({current_north_m:.2f}, {current_east_m:.2f}, {current_down_m:.2f})m "
+                  f"Dist to target: XY={distance_xy:.2f}m, Z={distance_z:.2f}m")
+
+            if distance_xy < position_tolerance_xy and distance_z < position_tolerance_z:
+                print(f"-- Reached target position (N:{north_m}, E:{east_m}, D:{down_m})!")
+                position_reached = True
+                break
+
+            await asyncio.sleep(0.1) 
+
+        if position_reached:
+            print("--- GOTO successful! Drone is at target position. ---")
+            self.hold_position_indefinitely()
+            return True
+        else:
+            return False
+        
+
+
+    async def hold_position_indefinitely(self) -> bool:
+        print("--- Commanding drone to HOLD current position indefinitely ---")
+        try:
+            await self.drone.action.hold()
+            print("-- Drone commanded to HOLD. It will stay here until a new action/offboard command.")
+            return True
+        except Exception as e:
+            print(f"Error putting drone in HOLD mode: {e}")
+            return False    

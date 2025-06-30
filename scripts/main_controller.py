@@ -78,7 +78,7 @@ async def main():
         return
 
     # Set an initial mission objective for context
-    drone_state.set_mission_objectives("Tackoff up to 20m and goto 10m in front and then land back and disarm.")
+    drone_state.set_mission_objectives("Tackoff up to 20m than goto 10m in north  and than land.")
 
     # --- Telemetry Subscriptions and Processing ---
     async def position_velocity_ned_handler(pos_vel_ned):

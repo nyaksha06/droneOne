@@ -85,11 +85,11 @@ class DroneController:
 
         if altitude_achieved:
             print("--- Take-off successful!  ---")
-            # self.hold_position_indefinitely()
+            self.hold_position_indefinitely()
             return True 
         else:
             print(f"--- Take-off failed: Did not reach target altitude within {timeout_seconds}s. ---")
-            # self.hold_position_indefinitely()
+            self.hold_position_indefinitely()
             try:
                 await self.drone.offboard.stop()
                 print("-- Offboard stopped after failed take-off.")
@@ -165,6 +165,7 @@ class DroneController:
 
         if position_reached:
             print("--- GOTO successful! Drone is at target position. ---")
+            self.hold_position_indefinitely()
             return True
         else:
             return False
