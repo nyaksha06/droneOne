@@ -62,7 +62,7 @@ class DroneController:
             return False
 
         altitude_achieved = False
-        altitude_tolerance = 0.5 
+        altitude_tolerance = 0.2
         print("Monitoring altitude for take-off...")
         
         timeout_seconds = 60 
@@ -76,7 +76,7 @@ class DroneController:
             
             print(f"Current altitude (NED Down): {current_down_m:.2f}m")
 
-            if abs(current_down_m - target_down_m) < altitude_tolerance:
+            if abs(current_down_m + target_down_m) < altitude_tolerance:
                 print(f"-- Reached target altitude of {target_altitude_m}m!")
                 altitude_achieved = True
                 break
@@ -84,10 +84,12 @@ class DroneController:
             await asyncio.sleep(0.1) 
 
         if altitude_achieved:
-            print("--- Take-off successful! Drone is in Offboard mode at target altitude. ---")
+            print("--- Take-off successful!  ---")
+            self.hold_position_indefinitely()
             return True 
         else:
             print(f"--- Take-off failed: Did not reach target altitude within {timeout_seconds}s. ---")
+            self.hold_position_indefinitely()
             try:
                 await self.drone.offboard.stop()
                 print("-- Offboard stopped after failed take-off.")
@@ -141,9 +143,11 @@ class DroneController:
 
         if position_reached:
             print("--- GOTO successful! Drone is at target position. ---")
+            self.hold_position_indefinitely()
             return True
         else:
             print(f"--- GOTO failed: Did not reach target position within {goto_timeout_seconds}s. ---")
+            self.hold_position_indefinitely()
             return False
 
     # **** MODIFIED HOLD FUNCTION ****
