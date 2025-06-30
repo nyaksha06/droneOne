@@ -114,7 +114,7 @@ async def main():
     llm_decision_interval_loops = 1 
 
     
-    current_llm_action = {"action": "do_nothing", "reason": "System startup, awaiting first LLM decision."}
+    current_llm_action = {"action": "Yet To Start Mission", "reason": "System startup, awaiting first LLM decision."}
     
     while True:
         try:

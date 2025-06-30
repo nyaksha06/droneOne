@@ -11,7 +11,6 @@ class DroneState:
     """
 
     def __init__(self):
-        """Initializes the DroneState with default empty values."""
         self._telemetry_data = {}
         self._visual_insights = {}
         self._mission_objectives = "No specific mission objective set."
@@ -21,34 +20,18 @@ class DroneState:
         logger.info("DroneState initialized.")
 
     def update_telemetry(self, telemetry_data: dict):
-        """
-        Updates the drone's telemetry data.
-        :param telemetry_data: Dictionary of processed telemetry from TelemetryProcessor.
-        """
         self._telemetry_data = telemetry_data
         # logger.debug(f"DroneState updated with telemetry: {telemetry_data.get('position', {}).get('relative_altitude_m')}")
 
     def update_visual_insights(self, visual_insights: dict):
-        """
-        Updates the drone's visual insights from camera processing.
-        :param visual_insights: Dictionary of insights from CameraProcessor.
-        """
         self._visual_insights = visual_insights
         # logger.debug(f"DroneState updated with visual insights: {visual_insights.get('detected_objects')}")
 
     def set_mission_objectives(self, objective: str):
-        """
-        Sets the current mission objective for the drone.
-        :param objective: A string describing the current mission objective.
-        """
         self._mission_objectives = objective
         logger.info(f"Mission objective set: {objective}")
 
     def update_flight_mode(self, flight_mode: str):
-        """
-        Updates the current flight mode of the drone.
-        :param flight_mode: The current flight mode string.
-        """
         self._current_flight_mode = flight_mode
         # logger.debug(f"Flight mode updated to: {flight_mode}")
 
@@ -56,9 +39,6 @@ class DroneState:
         self._last_action = last_action    
 
     def get_current_state(self) -> dict:
-        """
-        Returns the complete current state of the drone.
-        """
         return {
             "last_action": self._last_action,
             "telemetry": self._telemetry_data,
@@ -69,10 +49,6 @@ class DroneState:
         }
 
     def generate_llm_prompt(self) -> str:
-        """
-        Generates a concise, textual prompt for the LLM based on the current drone state.
-        This prompt summarizes all relevant information for the LLM's decision-making.
-        """
         state = self.get_current_state()
         
         telemetry = state.get("telemetry", {})
@@ -106,33 +82,40 @@ class DroneState:
 
         # Construct the final prompt
         prompt = (
-            f"You are a highly precise drone control AI assistant. "
-            f"Your ONLY task is to output a single JSON object representing a drone command. "
-            f"You MUST NOT include any conversational text, explanations, or extraneous characters "
-            f" here is current drone state and mission statement output next step with appropriate parameters."
-            f"Current Drone Status:\n"
-            f"  - Flight Mode: {state.get('current_flight_mode')}\n"
-            f"  - Telemetry: {telemetry_str}\n"
-            f"  - Visual Insights: {visual_str}\n"
-            f"  - Mission Objective: {state.get('mission_objectives')}\n\n"
-            f"  -Last Action: {self._last_action}"
-            f"Based on this information, what is the optimal next action for the drone to achieve its mission?\n"
-            f'choose action from "takeoff" , "land" , "goto_location"  only.\n'
-            f'see last action and mission statement to decide next step.\n'
-            f"The JSON object should conform to the following schema:\n"
-            f"```json\n"
-            f"{{\n"
-            f'  "action": "takeoff"  | "goto" | "land" ,\n'
-            f'  "parameters": {{\n'
-            f'    "altitude_m"?: float,      // Required for "takeoff", "goto_location" (e.g.,20)\n'
-            f'    "north_dist"?: float,    // Required for "goto_location" (e.g., 5 )\n'
-            f'    "east_dist"?: float    // Required for "goto_location" (e.g., 7)\n'
-            f'  }},\n'
-            f'  "reason"?: string           // Optional human-readable reason for the action\n'
-            f"}}\n"
-            f"```\n"
-            f"Ensure the JSON is well-formed and strictly follows this schema. Only output the JSON."
-        )
+    "You are an autonomous drone mission planner AI.\n"
+    "Your ONLY task is to output a single JSON object representing the drone's next command.\n\n"
+    " STRICT RULES:\n"
+    "- DO NOT include any conversational text, comments, or explanations.\n"
+    "- ONLY output a valid JSON object matching the schema below.\n"
+    "- Think step-by-step internally but output ONLY the next command as JSON.\n\n"
+    " Current Drone Status:\n"
+    f"  - Flight Mode: {state.get('current_flight_mode')}\n"
+    f"  - Telemetry: {telemetry_str}\n"
+    f"  - Visual Insights: {visual_str}\n"
+    f"  - Mission Objective: {state.get('mission_objectives')}\n"
+    f"  - Last Action: {self._last_action}\n\n"
+    " Instructions:\n"
+    "- Carefully analyze the current mission objective and the last action.\n"
+    "- Decide the optimal next step toward completing the mission.\n"
+    "- Choose ONLY from the following actions: \"takeoff\", \"goto_location\", \"land\".\n\n"
+    " JSON Schema:\n"
+    "```json\n"
+    "{\n"
+    '  "action": "takeoff" | "goto_location" | "land",\n'
+    '  "parameters": {\n'
+    '    "altitude_m"?: float,       // For "takeoff" and "goto_location"\n'
+    '    "north_dist"?: float,       // For "goto_location"\n'
+    '    "east_dist"?: float         // For "goto_location"\n'
+    "  },\n"
+    '  "reason"?: string             // (Optional) Brief reason for the action\n'
+    "}\n"
+    "```\n\n"
+    " IMPORTANT:\n"
+    "- Ensure the JSON is well-formed and syntactically valid.\n"
+    "- If the action is \"land\", parameters can be an empty object `{}`.\n"
+    "- Only output the JSON object. No text before or after.\n"
+)
+
         
         # logger.debug(f"Generated LLM Prompt:\n{prompt}")
         return prompt
