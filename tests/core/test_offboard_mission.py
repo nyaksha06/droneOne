@@ -1,6 +1,6 @@
 import asyncio
 from mavsdk import System
-from mavsdk.offboard import PositionNedYaw, VelocityBodyYawspeed, OffboardError
+from mavsdk.offboard import PositionNedYaw, VelocityBodyYawspeed, OffboardError,VelocityNedYaw
 from mavsdk.telemetry import Health, Position
 
 class DroneController:
@@ -85,11 +85,11 @@ class DroneController:
 
         if altitude_achieved:
             print("--- Take-off successful!  ---")
-            self.hold_position_indefinitely()
+            # self.hold_position_indefinitely()
             return True 
         else:
             print(f"--- Take-off failed: Did not reach target altitude within {timeout_seconds}s. ---")
-            self.hold_position_indefinitely()
+            # self.hold_position_indefinitely()
             try:
                 await self.drone.offboard.stop()
                 print("-- Offboard stopped after failed take-off.")
@@ -99,18 +99,22 @@ class DroneController:
 
     # Your existing goto function (no changes needed for this discussion)
     async def goto(self, north_m: float, east_m: float, down_m: float, yaw_deg: float = 0.0) -> bool:
-        # ... (your existing goto code) ...
+        """
+        Commands the drone to go to a specific (North, East, Down) position relative to home,
+        and optionally sets a yaw angle, using position-velocity commands.
+        The drone will attempt to reach the target with zero velocity.
+        Returns True on success, False on failure.
+        """
         print(f"--- Commanding drone to GOTO N:{north_m:.2f}m, E:{east_m:.2f}m, D:{down_m:.2f}m with Yaw:{yaw_deg:.2f}deg ---")
 
         try:
-            # Ensure offboard is started. If it was already in offboard, this will often just return.
-            # If it was in HOLD mode, this might transition back to offboard.
             await self.drone.offboard.start()
             print("-- Offboard mode ensured/started for GOTO.")
         except OffboardError:
-            pass # Already started
+            pass
 
-        target_position_ned = PositionNedYaw(north_m, east_m, down_m, yaw_deg)
+        target_position = PositionNedYaw(north_m, east_m, down_m, yaw_deg)
+        target_velocity = VelocityNedYaw(0.0, 0.0, 0.0, 0.0) 
 
         position_reached = False
         position_tolerance_xy = 0.5 
@@ -120,13 +124,28 @@ class DroneController:
         start_time = asyncio.get_event_loop().time()
 
         print("Monitoring position until target is reached...")
-        while not position_reached and (asyncio.get_event_loop().time() - start_time) < goto_timeout_seconds:
-            await self.drone.offboard.set_position_ned(target_position_ned)
+        # **** IMPORTANT CHANGE HERE: Subscribe to position_velocity_ned() ****
+        async for current_telemetry_pv_info in self.drone.telemetry.position_velocity_ned():
+            # Exit loop if timeout reached (check only when new telemetry arrives)
+            if (asyncio.get_event_loop().time() - start_time) > goto_timeout_seconds:
+                print(f"--- GOTO failed: Did not reach target position within {goto_timeout_seconds}s. ---")
+                return False # Exit the function, GOTO failed
+            
+            # Continuously send the position AND velocity setpoint
+            await self.drone.offboard.set_position_velocity_ned(
+                north_m=target_position.north_m,
+                east_m=target_position.east_m,
+                down_m=target_position.down_m,
+                velocity_north_m_s=target_velocity.north_m_s,
+                velocity_east_m_s=target_velocity.east_m_s,
+                velocity_down_m_s=target_velocity.down_m_s,
+                yaw_deg=target_position.yaw_deg
+            )
 
-            current_position_info = await self.drone.telemetry.position().__anext__()
-            current_north_m = current_position_info.north_m
-            current_east_m = current_position_info.east_m
-            current_down_m = current_position_info.down_m 
+            # **** Accessing north_m, east_m, down_m from the nested position object ****
+            current_north_m = current_telemetry_pv_info.position.north_m
+            current_east_m = current_telemetry_pv_info.position.east_m
+            current_down_m = current_telemetry_pv_info.position.down_m 
 
             distance_xy = ((current_north_m - north_m)**2 + (current_east_m - east_m)**2)**0.5
             distance_z = abs(current_down_m - down_m) 
@@ -139,15 +158,15 @@ class DroneController:
                 position_reached = True
                 break
 
-            await asyncio.sleep(0.1) 
+            await asyncio.sleep(0.1) # Continue sending setpoints/monitoring
 
         if position_reached:
             print("--- GOTO successful! Drone is at target position. ---")
-            self.hold_position_indefinitely()
             return True
         else:
-            print(f"--- GOTO failed: Did not reach target position within {goto_timeout_seconds}s. ---")
-            self.hold_position_indefinitely()
+            # If loop finished due to timeout (and position_reached is False),
+            # the return False would have already happened inside the loop.
+            # This part is for explicit fall-through if needed, but the loop exit handles it.
             return False
 
     # **** MODIFIED HOLD FUNCTION ****
