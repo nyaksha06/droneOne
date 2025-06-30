@@ -364,11 +364,11 @@ class MAVSDKInterface:
 
         if altitude_achieved:
             print("--- Take-off successful!  ---")
-            self.hold_position_indefinitely()
+            await self.hold_position_indefinitely()
             return True 
         else:
             print(f"--- Take-off failed: Did not reach target altitude within {timeout_seconds}s. ---")
-            self.hold_position_indefinitely()
+            await self.hold_position_indefinitely()
             try:
                 
                 print("-- Offboard stopped after failed take-off.")
@@ -435,7 +435,7 @@ class MAVSDKInterface:
 
         if position_reached:
             print("--- GOTO successful! Drone is at target position. ---")
-            self.hold_position_indefinitely()
+            await self.hold_position_indefinitely()
             return True
         else:
             return False
