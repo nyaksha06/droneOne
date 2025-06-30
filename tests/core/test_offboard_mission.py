@@ -129,8 +129,8 @@ class DroneController:
         target_velocity = VelocityNedYaw(0.0, 0.0, 0.0, 0.0) 
 
         position_reached = False
-        position_tolerance_xy = 0.5 
-        position_tolerance_z = 0.5  
+        position_tolerance_xy = 0.1
+        position_tolerance_z = 0.1  
         
         goto_timeout_seconds = 120 
         start_time = asyncio.get_event_loop().time()
