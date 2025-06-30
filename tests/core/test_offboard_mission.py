@@ -214,7 +214,7 @@ async def main():
         return
 
     # 2. Go to a new position (e.g., 10m North, 5m East, stay at 10m altitude)
-    if await drone_controller.goto(north_m=10.0, east_m=5.0, down_m=-10.0, yaw_deg=90.0):
+    if await drone_controller.goto(north_m=2.0, east_m=0.0, down_m=-10.0, yaw_deg=0.0):
         print("Successfully reached the first GOTO point.")
         
         # 3. Enter indefinite hold mode after the GOTO
@@ -237,7 +237,7 @@ async def main():
             return
 
         # 4. Go to another position after the hold
-        if await drone_controller.goto(north_m=0.0, east_m=10.0, down_m=-10.0, yaw_deg=180.0):
+        if await drone_controller.goto(north_m=0.0, east_m=2.0, down_m=-10.0, yaw_deg=90):
             print("Successfully reached the second GOTO point.")
         else:
             print("Failed to reach the second GOTO point. Attempting to land.")
