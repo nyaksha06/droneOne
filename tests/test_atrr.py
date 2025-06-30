@@ -74,7 +74,7 @@ async def inspect_telemetry_object():
     if hasattr(telemetry_obj, 'position_velocity_ned'):
         print("\n--- Inspecting a sample position_velocity_ned object ---")
         try:
-            async for pos_info in telemetry_obj.position():
+            async for pos_info in telemetry_obj.position_velocity_ned():
                 print(f"Sample position_velocity_ned object received: {pos_info}")
                 print(f"Attributes of the position_velocity_ned object:")
                 for attr in dir(pos_info):
