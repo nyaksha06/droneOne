@@ -200,6 +200,7 @@ class DroneController:
                     pass
                 else:
                     print("Drone is DISARMED")
+                    break
                 await asyncio.sleep(1) 
             return True 
 
