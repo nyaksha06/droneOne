@@ -125,7 +125,7 @@ class DroneController:
 
         print("Monitoring position until target is reached...")
         # **** IMPORTANT CHANGE HERE: Subscribe to position_velocity_ned() ****
-        async for current_telemetry_pv_info in self.drone.telemetry.position_velocity_ned():
+        async for current_telemetry_pv_info in self.drone.telemetry.position_velocity_ned(rate_hz=10.0):
             # Exit loop if timeout reached (check only when new telemetry arrives)
             if (asyncio.get_event_loop().time() - start_time) > goto_timeout_seconds:
                 print(f"--- GOTO failed: Did not reach target position within {goto_timeout_seconds}s. ---")
@@ -133,13 +133,14 @@ class DroneController:
             
             # Continuously send the position AND velocity setpoint
             await self.drone.offboard.set_position_velocity_ned(
-                north_m=target_position.north_m,
-                east_m=target_position.east_m,
-                down_m=target_position.down_m,
-                velocity_north_m_s=target_velocity.north_m_s,
-                velocity_east_m_s=target_velocity.east_m_s,
-                velocity_down_m_s=target_velocity.down_m_s,
-                yaw_deg=target_position.yaw_deg
+                # Corrected: Pass arguments positionally, not as keywords
+                target_position.north_m,
+                target_position.east_m,
+                target_position.down_m,
+                target_velocity.north_m_s,
+                target_velocity.east_m_s,
+                target_velocity.down_m_s,
+                target_position.yaw_deg 
             )
 
             # **** Accessing north_m, east_m, down_m from the nested position object ****
