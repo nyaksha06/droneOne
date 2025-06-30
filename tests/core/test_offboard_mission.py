@@ -32,7 +32,7 @@ class DroneController:
         print("-- Setting initial offboard setpoint (hover)")
         for _ in range(10): # Send multiple setpoints
             await self.drone.offboard.set_velocity_body(VelocityBodyYawspeed(0.0, 0.0, 0.0, 0.0))
-            await asyncio.sleep(0.1) 
+            await asyncio.sleep(0.005) 
         
         # 4. Start offboard mode
         print("-- Starting offboard mode")
