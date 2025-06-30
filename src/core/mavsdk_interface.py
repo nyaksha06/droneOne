@@ -333,7 +333,7 @@ class MAVSDKInterface:
             current_down_m = position_info.relative_altitude_m
             print(f"Current altitude (NED Down): {current_down_m:.2f}m")
 
-            if abs(current_down_m - target_down_m) < altitude_tolerance:
+            if abs(current_down_m + target_down_m) < altitude_tolerance:
                 print(f"-- Reached target altitude of {target_altitude_m}m!")
                 altitude_achieved = True
                 break
