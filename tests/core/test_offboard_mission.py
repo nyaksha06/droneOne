@@ -195,12 +195,13 @@ class DroneController:
             print("-- Landing command sent.")
 
             print("Waiting for drone to land and disarm...")
-            async for state in self.drone.core.arming_state():
-                if state.is_disarmed:
-                    print("-- Drone landed and disarmed!")
-                    return True
+            async for is_armed in self.drone.telemetry.armed():
+                if is_armed:
+                    pass
+                else:
+                    print("Drone is DISARMED")
                 await asyncio.sleep(1) 
-            return False 
+            return True 
 
         except Exception as e:
             print(f"Error during landing: {e}")
@@ -233,12 +234,7 @@ async def main():
         if await drone_controller.hold_position_indefinitely():
             print("Drone is now holding its position. Waiting for manual trigger or another function call...")
             
-            # This is where your script would pause or wait for an external event.
-            # For demonstration, let's just wait for a fixed time.
-            # In a real application, this might be:
-            # - Waiting for user input (e.g., via a keyboard listener)
-            # - Waiting for a vision system to confirm something
-            # - Waiting for a message from another system
+            
             print("Simulating a 10-second wait in hold mode...")
             await asyncio.sleep(10) # Drone continues to hold here
             print("Simulated wait finished. Proceeding...")
