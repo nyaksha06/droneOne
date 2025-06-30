@@ -70,6 +70,21 @@ async def inspect_telemetry_object():
             print(f"Could not get sample Position info: {e}")
 
 
+
+    if hasattr(telemetry_obj, 'position_velocity_ned'):
+        print("\n--- Inspecting a sample position_velocity_ned object ---")
+        try:
+            async for pos_info in telemetry_obj.position():
+                print(f"Sample position_velocity_ned object received: {pos_info}")
+                print(f"Attributes of the position_velocity_ned object:")
+                for attr in dir(pos_info):
+                    if not attr.startswith('__'):
+                        value = getattr(pos_info, attr)
+                        print(f"  {attr}: {value}")
+                break # Get only one sample
+        except Exception as e:
+            print(f"Could not get sample position_velocity_ned info: {e}")
+   
     # Disconnect (optional, but good practice)
     await drone.action.disarm() # Disarm before disconnecting if armed
     # MAVSDK will often clean up connections automatically when the script ends
