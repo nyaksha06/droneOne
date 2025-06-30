@@ -71,7 +71,7 @@ async def inspect_telemetry_object():
 
 
 
-    if hasattr(telemetry_obj, 'set_rate_position_velocity_nedd'):
+    if hasattr(telemetry_obj, 'set_rate_position_velocity_ned'):
         print("\n--- Inspecting a sample set_rate_position_velocity_ned object ---")
         try:
             async for pos_info in telemetry_obj.set_rate_position_velocity_ned():
