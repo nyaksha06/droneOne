@@ -146,7 +146,9 @@ async def main():
             drone_state.update_telemetry(processed_telemetry)
             drone_state.update_visual_insights(visual_insights)
             drone_state.update_last_action(current_llm_action["action"])
-            drone_state.update_last_mission_step(current_llm_action["last_mission_step"])
+            if "last_mission_step" in current_llm_action :
+                drone_state.update_last_mission_step(current_llm_action["last_mission_step"])
+            
 
             # 3. Generate LLM prompt (only if LLM decision is needed this cycle)
             if llm_loop_count % llm_decision_interval_loops == 0:

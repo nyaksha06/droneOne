@@ -120,7 +120,7 @@ class DroneState:
     '    "north_dist"?: float,       // For "goton"\n'
     '    "east_dist"?: float         // For "goto"\n'
     "  },\n"
-    '  "last_mission_step" ?: "step X  // from mission Plan provide step taken this time' 
+    '  "last_mission_step" ?: "step X  // from Mission Plan provide step taken this time' 
     '  "reason"?: string             // (Optional) Brief reason for the action\n'
     "}\n"
     "```\n\n"
