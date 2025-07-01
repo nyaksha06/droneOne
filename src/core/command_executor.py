@@ -42,7 +42,7 @@ class CommandExecutor:
                 success = await self.mavsdk_interface.arm() and await self.mavsdk_interface.offboard_takeoff(altitude)
             elif action_type == "land":
                 success = await self.mavsdk_interface.land()
-            elif action_type == "goto_location":
+            elif action_type == "goto":
                 latitude = parameters.get("east_dist")
                 longitude = parameters.get("north_dist")
                 altitude = parameters.get("altitude_m")
