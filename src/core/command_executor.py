@@ -43,8 +43,8 @@ class CommandExecutor:
             elif action_type == "land":
                 success = await self.mavsdk_interface.land()
             elif action_type == "goto":
-                latitude = parameters.get("east_dist")
-                longitude = parameters.get("north_dist")
+                latitude = parameters.get("north_dist")
+                longitude = parameters.get("east_dist")
                 altitude = parameters.get("altitude_m")
                 if latitude is not None and longitude is not None and altitude is not None:
                     latitude = int(latitude)
