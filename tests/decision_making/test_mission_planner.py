@@ -21,7 +21,7 @@ async def main_ollama_test():
        " takeoff at 20m  then move 10 in north, then move 10m in east and then land.",
        "takeoff at 10m and inspect reagion in 10m radius."
     ]
-    mission_planner = LLMMissionPlanner()
+    mission_planner = LLMMissionPlanner(OLLAMA_API_URL,OLLAMA_MODEL_NAME)
     for t in testcases:
         print(f"Testing Ollama -> {t}:")
         llm_output = await mission_planner.get_mission_plan(t)
