@@ -82,7 +82,7 @@ async def main():
     # Set an initial mission objective for context
     drone_state.set_mission_objectives("Tackoff up to 20m than goto 10m in north-- 5m east  and than land.")
 
-    mission_plan = mission_planner.get_mission_plan(drone_state._mission_objectives)
+    mission_plan = await mission_planner.get_mission_plan(drone_state._mission_objectives)
 
 
     drone_state.update_mission_plan(mission_plan)
