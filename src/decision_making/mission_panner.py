@@ -47,7 +47,7 @@ class LLMMissionPlanner:
             """
 
         payload = {
-            "model": self.ollama_model_namL,
+            "model": self.ollama_model_name,
             "prompt": prompt_content,
             "stream": False,
             "format": "json"
