@@ -1,16 +1,13 @@
 #!/bin/bash
 
-# This script starts the Ollama server and pulls the specified LLM model
-# for a direct (non-Docker) Ollama installation.
 
-# Exit immediately if a command exits with a non-zero status.
 set -e
 
 echo "Starting Ollama server..."
 
-# Define the model name to pull.
+
 # !!! IMPORTANT: This should match OLLAMA_MODEL_NAME in config/settings.py !!!
-OLLAMA_MODEL="llama3.2:3b" # Example: gemma:2b, llama2, mistral
+OLLAMA_MODEL="llama3.2:3b" 
 
 # Check if Ollama CLI is installed and in PATH
 if ! command -v ollama &> /dev/null
@@ -20,12 +17,9 @@ then
     exit 1
 fi
 
-# Start the Ollama server in the background (important for long-running service)
-# This command typically starts the Ollama daemon.
+
 echo "Launching Ollama daemon..."
-# You might need to use `nohup ollama serve &` or a systemd service for persistent backgrounding.
-# For simple script execution, `ollama serve` will run in the foreground.
-# If you want it truly in the background and detached from the terminal:
+
 nohup ollama serve > ollama.log 2>&1 &
 # Give it a moment to fully start
 sleep 5
