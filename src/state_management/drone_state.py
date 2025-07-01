@@ -45,6 +45,7 @@ class DroneState:
 
     def update_mission_plan(self,mission_plan):
         self._mission_plan = mission_plan    
+        print("Drone Mission Plan Updated")
 
     def get_current_state(self) -> dict:
         return {

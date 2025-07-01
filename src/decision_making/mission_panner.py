@@ -14,7 +14,7 @@ class LLMMissionPlanner:
         self.ollama_api_url = ollama_api_url
         self.ollama_model_name = ollama_model_name
         self.headers = {"Content-Type": "application/json"}
-        logger.info(f"LLMDecisionEngine initialized for model '{ollama_model_name}' at {ollama_api_url}")
+        logger.info(f"LLMMissionPlanner initialized for model '{ollama_model_name}' at {ollama_api_url}")
 
 
     async def get_mission_plan(self,mission_statement: str) -> Dict[str, Any]:
@@ -60,7 +60,7 @@ class LLMMissionPlanner:
                 response.raise_for_status()
 
                 response_json = response.json()
-                raw_text = response_json.get("response", "").strip()
+                raw_text = response_json      #.get("response", "").strip()
 
                 try:
                     # Attempt to parse directly
@@ -73,7 +73,9 @@ class LLMMissionPlanner:
                         .replace("```", "")
                         .strip()
                     )
+                    
                     parsed_json = json.loads(clean_text)
+                    print(f"LLM Mission Plan : {parsed_json}")
                     return parsed_json
 
         except json.JSONDecodeError as e:

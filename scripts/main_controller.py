@@ -84,7 +84,6 @@ async def main():
 
     mission_plan = mission_planner.get_mission_plan(drone_state._mission_objectives)
 
-    print(mission_plan)
 
     drone_state.update_mission_plan(mission_plan)
     
