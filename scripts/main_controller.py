@@ -18,6 +18,7 @@ from src.perception.telemetry_processor import TelemetryProcessor
 from src.perception.camera_processor import CameraProcessor
 from src.state_management.drone_state import DroneState
 from src.decision_making.llm_engine import LLMDecisionEngine
+from src.decision_making.mission_panner import LLMMissionPlanner
 from config.settings import SITL_SYSTEM_ADDRESS, CRITICAL_BATTERY_PERCENTAGE, OLLAMA_API_URL, OLLAMA_MODEL_NAME
 
 # Global variable to hold human commands from a separate task
@@ -68,6 +69,7 @@ async def main():
     camera_processor = CameraProcessor()
     drone_state = DroneState()
     llm_engine = LLMDecisionEngine(ollama_api_url=OLLAMA_API_URL, ollama_model_name=OLLAMA_MODEL_NAME)
+    mission_planner = LLMMissionPlanner(OLLAMA_API_URL,OLLAMA_MODEL_NAME)
     command_arbitrator = CommandArbitrator() 
     command_executor = CommandExecutor(mavsdk_interface) 
 
@@ -79,6 +81,8 @@ async def main():
 
     # Set an initial mission objective for context
     drone_state.set_mission_objectives("Tackoff up to 20m than goto 10m in north-- 5m east  and than land.")
+
+    drone_state.update_mission_plan(mission_planner.get_mission_plan(drone_state._mission_objectives))
 
     # --- Telemetry Subscriptions and Processing ---
     async def position_velocity_ned_handler(pos_vel_ned):
@@ -114,7 +118,7 @@ async def main():
     llm_decision_interval_loops = 1 
 
     
-    current_llm_action = {"action": "Yet To Start Mission", "reason": "System startup, awaiting first LLM decision."}
+    current_llm_action = {"action": "Yet To Start Mission","last_mission_step" : "Step 0", "reason": "System startup, awaiting first LLM decision."}
     
     while True:
         try:
@@ -139,6 +143,7 @@ async def main():
             drone_state.update_telemetry(processed_telemetry)
             drone_state.update_visual_insights(visual_insights)
             drone_state.update_last_action(current_llm_action["action"])
+            drone_state.update_last_mission_step(current_llm_action["last_mission_step"])
 
             # 3. Generate LLM prompt (only if LLM decision is needed this cycle)
             if llm_loop_count % llm_decision_interval_loops == 0:

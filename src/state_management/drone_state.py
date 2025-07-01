@@ -16,6 +16,8 @@ class DroneState:
         self._mission_objectives = "No specific mission objective set."
         self._current_flight_mode = "UNKNOWN" 
         self._last_action = "None"
+        self._last_mission_step = "None"
+        self._mission_plan = None
 
         logger.info("DroneState initialized.")
 
@@ -37,15 +39,23 @@ class DroneState:
 
     def update_last_action(self, last_action: str):
         self._last_action = last_action    
+    
+    def update_last_mission_step(self, last_mission_step: str):
+        self._last_mission_step = last_mission_step
+
+    def update_mission_plan(self,mission_plan):
+        self._mission_plan = mission_plan    
 
     def get_current_state(self) -> dict:
         return {
             "last_action": self._last_action,
+            "last_mission_step": self._last_mission_step,
+            "mission_plan": self._mission_plan,
             "telemetry": self._telemetry_data,
             "visual_insights": self._visual_insights,
             "mission_objectives": self._mission_objectives,
             "current_flight_mode": self._current_flight_mode,
-            "timestamp": asyncio.get_event_loop().time() 
+             
         }
 
     def generate_llm_prompt(self) -> str:
@@ -55,6 +65,7 @@ class DroneState:
         position = telemetry.get("position", {})
         velocity = telemetry.get("velocity", {})
         battery = telemetry.get("battery", {})
+
         
         # Build telemetry summary
         telemetry_summary = []
@@ -80,6 +91,8 @@ class DroneState:
         else:
             visual_str = "No objects currently detected."
 
+
+        
         # Construct the final prompt
         prompt = (
     "You are an autonomous drone mission planner AI.\n"
@@ -89,24 +102,24 @@ class DroneState:
     "- ONLY output a valid JSON object matching the schema below.\n"
     "- Think step-by-step internally but output ONLY the next command as JSON.\n\n"
     " Current Drone Status:\n"
-    # f"  - Flight Mode: {state.get('current_flight_mode')}\n"
-    # f"  - Telemetry: {telemetry_str}\n"
-    # f"  - Visual Insights: {visual_str}\n"
+    f"  - Mission Plan: {state.get('mission_plan')}\n"
+    f"  - Last mission step : {state.get('last_mission_step')}\n"
     f"  - Mission Objective: {state.get('mission_objectives')}\n"
     f"  - Last Action: {self._last_action}\n\n"
     " Instructions:\n"
-    "- Carefully analyze the current mission objective and the last action.\n"
+    "- Carefully analyze the current mission plan and the last action.\n"
     "- Decide the optimal next step toward completing the mission.\n"
-    "- Choose ONLY from the following actions: \"takeoff\", \"goto_location\", \"land\".\n\n"
+    "- Choose ONLY from the following actions: \"takeoff\", \"goto\", \"land\".\n\n"
     " JSON Schema:\n"
     "```json\n"
     "{\n"
-    '  "action": "takeoff" | "goto_location" | "land",\n'
+    '  "action": "takeoff" | "goto" | "land",\n'
     '  "parameters": {\n'
-    '    "altitude_m"?: float,       // For "takeoff" and "goto_location"\n'
-    '    "north_dist"?: float,       // For "goto_location"\n'
-    '    "east_dist"?: float         // For "goto_location"\n'
+    '    "altitude_m"?: float,       // For "takeoff" and "goto"\n'
+    '    "north_dist"?: float,       // For "goton"\n'
+    '    "east_dist"?: float         // For "goto"\n'
     "  },\n"
+    '  "last_mission_step" ?: "step X  // from mission Plan provide step taken this time' 
     '  "reason"?: string             // (Optional) Brief reason for the action\n'
     "}\n"
     "```\n\n"
