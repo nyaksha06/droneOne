@@ -124,6 +124,7 @@ class DroneState:
     "}\n"
     "```\n\n"
     " IMPORTANT:\n"
+    "- Provide all three parameter every time. if one is not in use than keep it's value 0."
     "- Ensure the JSON is well-formed and syntactically valid.\n"
     "- If the action is \"land\", parameters can be an empty object `{}`.\n"
     "- Only output the JSON object. No text before or after.\n"

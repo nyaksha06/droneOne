@@ -100,7 +100,7 @@ class LLMDecisionEngine:
                 return {}
             
             # Further validate action types and parameters
-            valid_actions = ["takeoff", "land", "goto_location", "do_nothing"]
+            valid_actions = ["takeoff", "land", "goto"]
             if parsed_json["action"] not in valid_actions:
                 logger.warning(f"Invalid action '{parsed_json['action']}' returned by LLM.")
                 return {}
