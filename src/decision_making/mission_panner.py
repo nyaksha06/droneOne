@@ -55,7 +55,7 @@ class LLMMissionPlanner:
 
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(f"{self.ollama_api_url}/api/generate", json=payload)
+                response = await client.post(f"{self.ollama_api_url}", json=payload)
                 response.raise_for_status()
 
                 response_json = response.json()
