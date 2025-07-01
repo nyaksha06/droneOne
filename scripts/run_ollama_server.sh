@@ -10,7 +10,7 @@ echo "Starting Ollama server..."
 
 # Define the model name to pull.
 # !!! IMPORTANT: This should match OLLAMA_MODEL_NAME in config/settings.py !!!
-OLLAMA_MODEL="llama3.2:3b" # Example: gemma:2b, llama2, mistral
+OLLAMA_MODEL="llama3:8b" # Example: gemma:2b, llama2, mistral
 
 # Check if Ollama CLI is installed and in PATH
 if ! command -v ollama &> /dev/null
