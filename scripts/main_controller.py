@@ -82,7 +82,7 @@ async def main():
     # Set an initial mission objective for context
     drone_state.set_mission_objectives("Tackoff up to 20m than goto 10m in north-- 5m east  and than land.")
 
-    drone_state.update_mission_plan(mission_planner.get_mission_plan(drone_state._mission_objectives))
+    # drone_state.update_mission_plan(mission_planner.get_mission_plan(drone_state._mission_objectives))
 
     # --- Telemetry Subscriptions and Processing ---
     async def position_velocity_ned_handler(pos_vel_ned):
@@ -143,7 +143,7 @@ async def main():
             drone_state.update_telemetry(processed_telemetry)
             drone_state.update_visual_insights(visual_insights)
             drone_state.update_last_action(current_llm_action["action"])
-            drone_state.update_last_mission_step(current_llm_action["last_mission_step"])
+            # drone_state.update_last_mission_step(current_llm_action["last_mission_step"])
 
             # 3. Generate LLM prompt (only if LLM decision is needed this cycle)
             if llm_loop_count % llm_decision_interval_loops == 0:
@@ -151,7 +151,7 @@ async def main():
                 new_llm_action = await llm_engine.get_action_from_llm(llm_prompt)
                 if new_llm_action: 
                     current_llm_action = new_llm_action
-                logger.info(f"LLM Decision Cycle: Proposed action: {current_llm_action.get('action')}")
+                logger.info(f"LLM Decision Cycle: Proposed action: {current_llm_action}")
                 llm_loop_count = 0 
 
             llm_loop_count += 1
