@@ -59,29 +59,29 @@ class LLMMissionPlanner:
                 response = await client.post(f"{self.ollama_api_url}", json=payload)
                 response.raise_for_status()
 
-                response_json = response.json()
-                raw_text = response_json      #.get("response", "").strip()
+                # response_json = response.json()
+                # raw_text = response_json.get("response", "").strip()
 
-                try:
-                    # Attempt to parse directly
-                    parsed_json = json.loads(raw_text)
-                    return parsed_json
-                except json.JSONDecodeError:
-                    # Fallback: Clean markdown artifacts if any (shouldn't happen with format='json')
-                    clean_text = (
-                        raw_text.replace("```json", "")
-                        .replace("```", "")
-                        .strip()
-                    )
+                # try:
+                #     # Attempt to parse directly
+                #     parsed_json = json.loads(raw_text)
+                #     return parsed_json
+                # except json.JSONDecodeError:
+                #     # Fallback: Clean markdown artifacts if any (shouldn't happen with format='json')
+                #     clean_text = (
+                #         raw_text.replace("```json", "")
+                #         .replace("```", "")
+                #         .strip()
+                #     )
                     
-                    parsed_json = json.loads(clean_text)
-                    print(f"LLM Mission Plan : {parsed_json}")
-                    return parsed_json
+                    # parsed_json = json.loads(clean_text)
+                print(f"LLM Mission Plan : {response}")
+                return response
 
-        except json.JSONDecodeError as e:
-            print(f"[ERROR] JSON parsing error from Ollama: {e}")
-            print(f"[DEBUG] Ollama Raw Response:\n{raw_text}")
-            return {"action": "error", "message": f"Invalid JSON response: {e}"}
+        # except json.JSONDecodeError as e:
+        #     print(f"[ERROR] JSON parsing error from Ollama: {e}")
+        #     print(f"[DEBUG] Ollama Raw Response:\n{raw_text}")
+        #     return {"action": "error", "message": f"Invalid JSON response: {e}"}
 
         except httpx.RequestError as e:
             print(f"[ERROR] Network error communicating with Ollama: {e}")
