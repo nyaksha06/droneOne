@@ -95,7 +95,7 @@ class DroneState:
     
     f"  -We have taken these steps -> Last Action: {self._last_actions}\n\n"
     "Now you have to provide next step from takeoff | goto | Land and follow instruction provided below."
-    "If we are in middle of the mission than do not output Takeoff And if we have completed all the mission steps in last actions and output Land."
+    "If last_actions is empty means mission has not started so start with Takeoff,if we are in middle of the mission than do not output Takeoff , if we have completed all the mission steps in last actions and output Land."
     " Instructions:\n"
     "- Carefully analyze the current mission plan and the last action.\n"
     "- Decide the optimal next step toward completing the mission.\n"
