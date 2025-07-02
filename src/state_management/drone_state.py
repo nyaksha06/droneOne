@@ -51,23 +51,23 @@ class DroneState:
     def generate_llm_prompt(self) -> str:
         state = self.get_current_state()
         
-        telemetry = state.get("telemetry", {})
-        position = telemetry.get("position", {})
-        velocity = telemetry.get("velocity", {})
-        battery = telemetry.get("battery", {})
+        # telemetry = state.get("telemetry", {})
+        # position = telemetry.get("position", {})
+        # velocity = telemetry.get("velocity", {})
+        # battery = telemetry.get("battery", {})
 
         
         # Build telemetry summary
-        telemetry_summary = []
-        if position.get("relative_altitude_m") is not None:
-            telemetry_summary.append(f"Rel Alt: {position['relative_altitude_m']:.2f}m")
-        if position.get("latitude_deg") is not None and position.get("longitude_deg") is not None:
-             telemetry_summary.append(f"Lat/Lon: {position['latitude_deg']:.4f},{position['longitude_deg']:.4f}")
-        if velocity.get("ground_speed_m_s") is not None:
-            telemetry_summary.append(f"Ground Speed: {velocity['ground_speed_m_s']:.2f}m/s")
-        if battery.get("remaining_percent") is not None:
-            telemetry_summary.append(f"Battery: {battery['remaining_percent']:.1f}%")
-        telemetry_str = ", ".join(telemetry_summary) if telemetry_summary else "Telemetry data unavailable."
+        telemetry_summary = self._telemetry_data
+        # if position.get("relative_altitude_m") is not None:
+        #     telemetry_summary.append(f"Rel Alt: {position['relative_altitude_m']:.2f}m")
+        # if position.get("latitude_deg") is not None and position.get("longitude_deg") is not None:
+        #      telemetry_summary.append(f"Lat/Lon: {position['latitude_deg']:.4f},{position['longitude_deg']:.4f}")
+        # if velocity.get("ground_speed_m_s") is not None:
+        #     telemetry_summary.append(f"Ground Speed: {velocity['ground_speed_m_s']:.2f}m/s")
+        # if battery.get("remaining_percent") is not None:
+        #     telemetry_summary.append(f"Battery: {battery['remaining_percent']:.1f}%")
+        # telemetry_str = ", ".join(telemetry_summary) if telemetry_summary else "Telemetry data unavailable."
 
         # Build visual insights summary
         visual_summary = []
@@ -85,16 +85,17 @@ class DroneState:
         
         # Construct the final prompt
         prompt = (
-    "You are an autonomous drone mission planner AI.\n"
+    "You are an autonomous drone pilot AI.\n"
     "Your ONLY task is to output a single JSON object representing the drone's next command.\n\n"
     " STRICT RULES:\n"
     "- DO NOT include any conversational text, comments, or explanations.\n"
     "- ONLY output a valid JSON object matching the schema below.\n"
     "- Think step-by-step internally but output ONLY the next command as JSON.\n\n"
     f"  -Here is your Mission Plan: {state.get('mission_plan')}\n"
-    
-    f"  -We have taken these steps -> Last Action: {self._last_actions}\n\n"
-    "Now you have to provide next step from takeoff | goto | Land and follow instruction provided below."
+    f" - use this telemetry daya:{telemetry_summary} to get idea of current position and flying state of drone."
+
+    f"  -We have taken these steps so far -> Last Action: {self._last_actions}. if this is empty mean mission is yet to start. Get idea from telemetry data weather drone is flying or not.\n\n"
+    "Now you have to provide next step from takeoff | goto | Land  only and follow instruction provided below."
     "If last_actions is empty means mission has not started so start with Takeoff,if we are in middle of the mission than do not output Takeoff , if we have completed all the mission steps in last actions and output Land."
     " Instructions:\n"
     "- Carefully analyze the current mission plan and the last action.\n"
@@ -112,6 +113,8 @@ class DroneState:
     "}\n"
     "```\n\n"
     " IMPORTANT:\n"
+    "- Do not provide commands out of order. example - is drone is not in air than do not provide goto command, first start with takeoff."
+    "- if mission steps are taken already than land the drone."
     "- Provide all three parameter every time. if one is not in use than keep it's value 0."
     "- Ensure the JSON is well-formed and syntactically valid.\n"
     "- If the action is \"land\", parameters can be an empty object `{}`.\n"

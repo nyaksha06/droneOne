@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from src.core.mavsdk_interface import MAVSDKInterface
 from src.core.command_arbitrator import CommandArbitrator 
 from src.core.command_executor import CommandExecutor     
-from src.perception.telemetry_processor import TelemetryProcessor
+from src.perception.simple_telemetry import SimTelemetryProcessor
 from src.perception.camera_processor import CameraProcessor
 from src.state_management.drone_state import DroneState
 from src.decision_making.llm_engine import LLMDecisionEngine
@@ -65,7 +65,7 @@ async def main():
     """
     # Initialize components
     mavsdk_interface = MAVSDKInterface(system_address=SITL_SYSTEM_ADDRESS)
-    # telemetry_processor = TelemetryProcessor()
+    telemetry_processor = SimTelemetryProcessor(mavsdk_interface.drone)
     camera_processor = CameraProcessor()
     drone_state = DroneState()
     llm_engine = LLMDecisionEngine(ollama_api_url=OLLAMA_API_URL, ollama_model_name=OLLAMA_MODEL_NAME)
@@ -122,9 +122,10 @@ async def main():
             await camera_processor.process_camera_feed()
 
             # 2. Update central drone state
-            
+            telemetry_data = await telemetry_processor.get_processed_data()
             visual_insights = camera_processor.get_visual_insights()
             drone_state.update_visual_insights(visual_insights)
+            drone_state.update_telemetry(telemetry_data)
             drone_state.update_last_actions(current_llm_action)
             
 
