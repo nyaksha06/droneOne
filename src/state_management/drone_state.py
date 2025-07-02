@@ -14,9 +14,7 @@ class DroneState:
         self._telemetry_data = {}
         self._visual_insights = {}
         self._mission_objectives = "No specific mission objective set."
-        self._current_flight_mode = "UNKNOWN" 
-        self._last_action = "None"
-        self._last_mission_step = "None"
+        self._last_actions = []
         self._mission_plan = None
 
         logger.info("DroneState initialized.")
@@ -33,15 +31,8 @@ class DroneState:
         self._mission_objectives = objective
         logger.info(f"Mission objective set: {objective}")
 
-    def update_flight_mode(self, flight_mode: str):
-        self._current_flight_mode = flight_mode
-        # logger.debug(f"Flight mode updated to: {flight_mode}")
-
-    def update_last_action(self, last_action: str):
-        self._last_action = last_action    
-    
-    def update_last_mission_step(self, last_mission_step: str):
-        self._last_mission_step = last_mission_step
+    def update_last_actions(self, last_action: str):
+        self._last_actions.append(last_action)     
 
     def update_mission_plan(self,mission_plan):
         self._mission_plan = mission_plan    
@@ -49,14 +40,12 @@ class DroneState:
 
     def get_current_state(self) -> dict:
         return {
-            "last_action": self._last_action,
-            "last_mission_step": self._last_mission_step,
+            "last_actions": self._last_actions,
             "mission_plan": self._mission_plan,
             "telemetry": self._telemetry_data,
             "visual_insights": self._visual_insights,
             "mission_objectives": self._mission_objectives,
-            "current_flight_mode": self._current_flight_mode,
-             
+            
         }
 
     def generate_llm_prompt(self) -> str:
@@ -102,11 +91,11 @@ class DroneState:
     "- DO NOT include any conversational text, comments, or explanations.\n"
     "- ONLY output a valid JSON object matching the schema below.\n"
     "- Think step-by-step internally but output ONLY the next command as JSON.\n\n"
-    " Current Drone Status:\n"
-    f"  - Mission Plan: {state.get('mission_plan')}\n"
-    f"  - Last mission step : {state.get('last_mission_step')}\n"
-    f"  - Mission Objective: {state.get('mission_objectives')}\n"
-    f"  - Last Action: {self._last_action}\n\n"
+    f"  -Here is your Mission Plan: {state.get('mission_plan')}\n"
+    
+    f"  -We have taken these steps -> Last Action: {self._last_actions}\n\n"
+    "Now you have to provide next step from takeoff | goto | Land and follow instruction provided below."
+    "If we are in middle of the mission than do not output Takeoff And if we have completed all the mission steps in last actions and output Land."
     " Instructions:\n"
     "- Carefully analyze the current mission plan and the last action.\n"
     "- Decide the optimal next step toward completing the mission.\n"
@@ -120,8 +109,6 @@ class DroneState:
     '    "north_dist"?: float,       // For "goton"\n'
     '    "east_dist"?: float         // For "goto"\n'
     "  },\n"
-    '  "last_mission_step" ?: "step X  // from Mission Plan provide step taken this time' 
-    '  "reason"?: string             // (Optional) Brief reason for the action\n'
     "}\n"
     "```\n\n"
     " IMPORTANT:\n"
