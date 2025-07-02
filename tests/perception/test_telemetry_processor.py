@@ -43,10 +43,10 @@ async def main():
     asyncio.ensure_future(mavsdk_interface.subscribe_attitude_euler(attitude_euler_handler))
     asyncio.ensure_future(mavsdk_interface.subscribe_battery(battery_handler))
     
+    while True:
+        processed_telemetry = telemetry_processor.get_processed_data()
 
-    processed_telemetry = telemetry_processor.get_processed_data()
-
-    print(processed_telemetry)
+        print(processed_telemetry)
 
 
 
@@ -55,5 +55,7 @@ async def main():
 if __name__ == "__main__":
     try:
         asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Application terminated by user (Ctrl+C).")    
     except Exception as e:
         print(f"Unhandled exception during application startup/shutdown: {e}")
