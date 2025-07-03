@@ -24,9 +24,10 @@ class CommandExecutor:
         self.drone = mavsdk_interface.drone # Direct access to the MAVSDK System object
         self._offboard_setpoint_task = None # Task for continuous offboard setpoints
         self._offboard_active = False # Flag to track if offboard mode is active
+        self._current_offboard_setpoint = PositionNedYaw(0.0, 0.0, 0.0, 0.0) # Store the last commanded setpoint
         logger.info("CommandExecutor initialized.")
 
-    async def _start_offboard_setpoint_stream(self, north_m: float = 0.0, east_m: float = 0.0, down_m: float = 0.0, yaw_deg: float = 0.0):
+    async def _start_offboard_setpoint_stream(self, north_m: float, east_m: float, down_m: float, yaw_deg: float):
         """
         Starts a continuous stream of NED position setpoints for offboard control.
         This is required before entering offboard mode.
@@ -36,27 +37,32 @@ class CommandExecutor:
         :param down_m: Down component of position setpoint in meters (negative for altitude).
         :param yaw_deg: Yaw angle in degrees.
         """
+        # Store the new setpoint
+        self._current_offboard_setpoint = PositionNedYaw(north_m, east_m, down_m, yaw_deg)
+
         if self._offboard_setpoint_task and not self._offboard_setpoint_task.done():
-            logger.warning("Offboard setpoint stream already running. Stopping existing stream.")
-            await self._stop_offboard_setpoint_stream() # Stop existing before starting new
+            logger.debug("Offboard setpoint stream already running. Cancelling existing task to start new one.")
+            self._offboard_setpoint_task.cancel()
+            try:
+                await self._offboard_setpoint_task
+            except asyncio.CancelledError:
+                pass # Expected cancellation
+            self._offboard_setpoint_task = None
 
         logger.info(f"Starting offboard position setpoint stream to N={north_m}, E={east_m}, D={down_m}, Yaw={yaw_deg}...")
         
-        # Send a few setpoints before starting offboard mode
-        # This is a MAVSDK requirement to ensure a smooth transition.
+        # Send a few setpoints before starting offboard mode (MAVSDK requirement)
         for i in range(10):
-            await self.drone.offboard.set_position_ned(
-                PositionNedYaw(north_m, east_m, down_m, yaw_deg))
-            await asyncio.sleep(0.005)
+            await self.drone.offboard.set_position_ned(self._current_offboard_setpoint)
+            await asyncio.sleep(0.1)
 
         async def send_setpoints_loop():
             """Continuously sends the specified position setpoints."""
             logger.info("Offboard setpoint task started, continuously sending setpoints.")
             try:
                 while True:
-                    await self.drone.offboard.set_position_ned(
-                        PositionNedYaw(north_m, east_m, down_m, yaw_deg))
-                    await asyncio.sleep(0.005) # Send setpoints at 10Hz
+                    await self.drone.offboard.set_position_ned(self._current_offboard_setpoint)
+                    await asyncio.sleep(0.1) # Send setpoints at 10Hz
             except asyncio.CancelledError:
                 logger.info("Offboard setpoint stream cancelled.")
             except Exception as e:
@@ -64,7 +70,7 @@ class CommandExecutor:
 
         self._offboard_setpoint_task = asyncio.ensure_future(send_setpoints_loop())
         self._offboard_active = True
-        logger.info("Offboard setpoint stream initiated.")
+        logger.info("Offboard setpoint stream initiated and running.")
 
 
     async def _stop_offboard_setpoint_stream(self):
@@ -81,35 +87,46 @@ class CommandExecutor:
             self._offboard_active = False
             logger.info("Offboard setpoint stream stopped.")
 
-    async def _try_set_offboard_mode(self, target_altitude_m: float = 10.0):
+    async def _try_set_offboard_mode(self):
         """
         Tries to set the drone to Offboard mode.
-        Assumes setpoints are already streaming.
+        Ensures a setpoint stream is active before attempting to start Offboard.
+        If no stream is active, it starts one to hold the current position.
         """
         if not self._offboard_active:
-            # Start a default stream to hold current position/altitude if not already active
-            current_pos_ned = await self.mavsdk_interface._read_stream_value(self.drone.telemetry.position_velocity_ned)
-            if current_pos_ned:
+            logger.info("Offboard not active. Attempting to start initial setpoint stream to hold current position.")
+            current_pos_ned_data = await self.mavsdk_interface._read_stream_value(self.drone.telemetry.position_velocity_ned)
+            
+            if current_pos_ned_data:
+                # Start stream to hold current NED position
                 await self._start_offboard_setpoint_stream(
-                    current_pos_ned.position.north_m,
-                    current_pos_ned.position.east_m,
-                    current_pos_ned.position.down_m,
-                    0.0 # Keep current yaw for now
+                    current_pos_ned_data.position.north_m,
+                    current_pos_ned_data.position.east_m,
+                    current_pos_ned_data.position.down_m,
+                    0.0 # Assuming current yaw for now, or get it from telemetry.attitude_euler
                 )
+                logger.info(f"Initial Offboard stream started at current NED: N={current_pos_ned_data.position.north_m:.2f}, E={current_pos_ned_data.position.east_m:.2f}, D={current_pos_ned_data.position.down_m:.2f}")
             else:
-                await self._start_offboard_setpoint_stream(0.0, 0.0, -target_altitude_m, 0.0) # Fallback to default alt
-            await asyncio.sleep(0.05) # Give it a moment to start
+                logger.warning("Could not get current NED position for initial offboard stream. Starting at (0,0,-10) NED.")
+                await self._start_offboard_setpoint_stream(0.0, 0.0, -10.0, 0.0) # Fallback to default alt if no position data
+            
+            await asyncio.sleep(0.5) # Give it a moment to start streaming setpoints
 
         logger.info("Trying to set Offboard mode...")
         try:
             await self.drone.offboard.start()
-            logger.info("Offboard mode enabled.")
+            logger.info("Offboard mode enabled successfully.")
             return True
         except OffboardError as e:
-            logger.error(f"Failed to start offboard mode: {e}. Is the drone armed and in the air?")
+            logger.error(f"Failed to start offboard mode: {e}. Is the drone armed and in the air with good GPS?")
+            # Attempt to stop the setpoint stream if offboard failed to start
+            if self._offboard_active:
+                await self._stop_offboard_setpoint_stream()
             return False
         except Exception as e:
             logger.error(f"An unexpected error occurred while setting offboard mode: {e}")
+            if self._offboard_active:
+                await self._stop_offboard_setpoint_stream()
             return False
 
     async def _try_set_hold_mode(self):
@@ -166,8 +183,8 @@ class CommandExecutor:
                     await asyncio.sleep(0.5) # Give it a moment to stabilize
                 success = await self.mavsdk_interface.land()
                 # After landing, disarm
-                # if success:
-                #     await self.mavsdk_interface.disarm()
+                if success:
+                    await self.mavsdk_interface.disarm()
                 return success
 
             elif action == "disarm":
@@ -184,64 +201,30 @@ class CommandExecutor:
                     logger.warning("Drone not connected, cannot goto_location.")
                     return False
                 
-                # For goto_location, we will use the high-level MAVSDK action.goto_location
-                # This action handles its own mode switching and path planning.
-                # It typically uses global coordinates.
-                # If LLM provides relative NED, we need to convert it.
-                
-                # For simplicity in this phase, let's assume LLM provides global lat/lon
-                # OR we calculate global target from current position + NED offset.
-                # For now, let's assume LLM provides north_m, east_m, altitude_m relative to current.
-                # We need current global position to calculate target global position.
-
-                current_pos = await self.mavsdk_interface._read_stream_value(self.drone.telemetry.position)
-                if not current_pos:
-                    logger.error("Could not get current global position for goto_location.")
-                    return False
-
                 north_m = params.get("north_m")
                 east_m = params.get("east_m")
-                altitude_m = params.get("altitude_m") # This is relative altitude
-
+                altitude_m = params.get("altitude_m") # This is relative altitude (positive up)
+                
                 if north_m is None or east_m is None or altitude_m is None:
                     logger.error("goto_location requires north_m, east_m, and altitude_m parameters.")
                     return False
 
-                # Convert relative NED to a new global Lat/Lon
-                # This is a simplification. A proper conversion might use geographiclib.
-                # For small distances, a simple approximation is often used:
-                # 1 degree lat ~ 111,139 meters
-                # 1 degree lon ~ 111,139 * cos(latitude) meters
-                
-                # Approximate conversion (for short distances in SITL)
-                # More robust solution would involve a proper NED to Lat/Lon conversion
-                # using a library like geographiclib or mavsdk-python's internal helpers if available.
-                
-                # For now, let's use the MAVSDK action.goto_location with current position as reference
-                # and assume the LLM is smart enough to give us *relative* offsets that it expects
-                # to be applied from the current drone position.
-                # MAVSDK's action.goto_location takes absolute lat/lon, so we need to calculate it.
-                
-                # This is a placeholder. Real implementation needs a robust NED to Lat/Lon conversion.
-                # For SITL, often it's easier to use Offboard.set_position_ned for relative moves.
-                # If the LLM is providing relative N/E/Alt, then the CommandExecutor should use Offboard.
-                # Let's revert to Offboard for `goto_location` for relative moves, as it's more direct.
-
-                # REVERTING TO OFFBOARD FOR GOTO_LOCATION FOR RELATIVE MOVES
-                # This is more consistent with LLM providing relative N/E/Alt.
+                # Ensure offboard mode is active and setpoints are streaming
                 if not self._offboard_active:
-                    success_offboard = await self._try_set_offboard_mode(target_altitude_m=altitude_m) # Start stream at target alt
+                    success_offboard = await self._try_set_offboard_mode()
                     if not success_offboard:
-                        logger.error("Failed to enter offboard mode for goto_location.")
+                        logger.error("Failed to enter offboard mode for goto_location. Cannot proceed.")
                         return False
                     await asyncio.sleep(0.5) # Give it a moment to stabilize in offboard
 
-                logger.info(f"Going to relative NED: N={north_m}m, E={east_m}m, Alt={altitude_m}m")
+                logger.info(f"Commanding relative NED position: N={north_m}m, E={east_m}m, Alt={altitude_m}m (Down={-altitude_m}m)")
                 # MAVSDK's offboard.set_position_ned expects 'down' to be negative for altitude
-                await self.drone.offboard.set_position_ned(
-                    PositionNedYaw(north_m, east_m, -altitude_m, 0.0) # Yaw 0.0 for now
+                # We need to update the continuous setpoint stream with the new target.
+                # The _start_offboard_setpoint_stream will cancel the old and start a new one.
+                await self._start_offboard_setpoint_stream(
+                    north_m, east_m, -altitude_m, 0.0 # Yaw 0.0 for now
                 )
-                # For a simple goto, we send it once. For continuous tracking, this would be in a loop.
+                logger.info(f"Offboard setpoint stream updated for goto_location.")
                 return True
 
             elif action == "follow_target": # NEW ACTION
@@ -258,39 +241,44 @@ class CommandExecutor:
                     return False
 
                 logger.info(f"Initiating mock follow for target '{target_id}' at {follow_distance_m}m distance, altitude {altitude_m}m.")
-                # --- MOCK IMPLEMENTATION FOR PHASE 1 ---
-                # In Phase 2, this would involve:
-                # 1. Getting the *current* estimated position of the target from CameraProcessor/State.
-                # 2. Calculating a desired drone position relative to the target (e.g., 10m behind, at 15m alt).
-                # 3. Setting Offboard mode if not already active.
-                # 4. Continuously sending position/velocity setpoints to track the target.
                 
                 # Ensure offboard mode is active if we want to realistically "follow"
                 if not self._offboard_active:
-                    success_offboard = await self._try_set_offboard_mode(target_altitude_m=altitude_m)
+                    success_offboard = await self._try_set_offboard_mode()
                     if not success_offboard:
-                        logger.error("Failed to enter offboard mode for follow_target.")
+                        logger.error("Failed to enter offboard mode for follow_target. Cannot proceed.")
                         return False
                     await asyncio.sleep(0.5) 
 
-                # For a mock follow, we can just command it to hold its current position
-                # or a predefined position to simulate "being ready to follow".
-                # The _start_offboard_setpoint_stream will maintain the last commanded position.
-                logger.info("Mock follow_target: Drone will attempt to hold current position/altitude.")
+                # For a mock follow, we just ensure offboard is active and holding position.
+                # A true follow would continuously update _current_offboard_setpoint based on target's movement.
+                logger.info("Mock follow_target: Drone will attempt to hold current position/altitude (or last commanded offboard setpoint).")
+                # The continuous setpoint stream (if started by _try_set_offboard_mode) will handle this.
                 
                 return True
 
 
             elif action == "do_nothing":
                 logger.info("Drone commanded to do nothing.")
-                # If currently in offboard, ensure setpoints are still streaming to hold position
+                # If currently in offboard, ensure setpoints are still streaming to hold current position
                 if self._offboard_active and (not self._offboard_setpoint_task or self._offboard_setpoint_task.done()):
-                     # This might be redundant if _try_set_offboard_mode is always called first.
-                     # But it ensures the stream is active if LLM says "do_nothing" while already in offboard.
-                     # For a true "do_nothing" in offboard, you'd send current position setpoints.
-                     # For simplicity, we assume if offboard is active, the stream is running.
-                     pass # The continuous stream started by _try_set_offboard_mode already handles holding position.
-                # If not in offboard, it will just maintain its current flight mode (e.g., HOLD in SITL)
+                     # If offboard is active but its setpoint task stopped, restart it to hold current position
+                    current_pos_ned_data = await self.mavsdk_interface._read_stream_value(self.drone.telemetry.position_velocity_ned)
+                    if current_pos_ned_data:
+                        await self._start_offboard_setpoint_stream(
+                            current_pos_ned_data.position.north_m,
+                            current_pos_ned_data.position.east_m,
+                            current_pos_ned_data.position.down_m,
+                            0.0 # Keep current yaw for now
+                        )
+                    else:
+                        logger.warning("Could not get current NED position for 'do_nothing' offboard stream. Drone might drift.")
+                        # If no position, it's hard to hold. Maybe just stop offboard.
+                        if self._offboard_active:
+                            await self._try_set_hold_mode() # Exit offboard if we can't hold position
+                elif not self._offboard_active:
+                    # If not in offboard, "do_nothing" means stay in current flight mode (e.g., HOLD in SITL)
+                    pass
                 return True
 
             else:

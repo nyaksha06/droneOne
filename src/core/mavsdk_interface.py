@@ -57,6 +57,7 @@ class MAVSDKInterface:
     async def disconnect(self):
         """
         Disconnects from the drone and stops any active telemetry subscriptions.
+        Also attempts to close the MAVSDK System object cleanly.
         """
         logger.info("Disconnecting from drone...")
         for task in self._telemetry_tasks:
@@ -66,8 +67,14 @@ class MAVSDKInterface:
             except asyncio.CancelledError:
                 pass # Expected
         self._telemetry_tasks.clear()
-        # MAVSDK System object doesn't have a direct disconnect() method
-        # Disconnecting the loop or program termination handles it.
+        
+        # NEW: Explicitly close the MAVSDK System object
+        try:
+            await self.drone.close()
+            logger.info("MAVSDK System closed cleanly.")
+        except Exception as e:
+            logger.warning(f"Error closing MAVSDK System: {e}")
+
         self.is_connected = False
         logger.info("Disconnected from drone.")
 
@@ -179,8 +186,6 @@ class MAVSDKInterface:
             try:
                 await stream_generator.aclose()
             except RuntimeError as e:
-                # This can happen if the event loop is already closing or generator is already closed.
-                # It's an "exception ignored" type of warning from asyncio/grpc.
                 logger.debug(f"Error closing stream generator for {stream_func.__name__}: {e}")
             except Exception as e:
                 logger.warning(f"Unexpected error during stream generator aclose for {stream_func.__name__}: {e}")
