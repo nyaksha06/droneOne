@@ -112,7 +112,7 @@ async def main():
     # --- Control flags for human/LLM interaction ---
     mission_finished = False
     # Start with human control active. LLM will not be queried initially.
-    command_arbitrator.set_human_control({"action": "pause_llm", "reason": "System startup, human control active."})
+    # command_arbitrator.set_human_control({"action": "pause_llm", "reason": "System startup, human control active."})
     drone_state.set_human_control_status(True) # Inform drone_state
 
     # Flags to manage trigger and LLM following state
