@@ -47,7 +47,7 @@ class CommandExecutor:
         for i in range(10):
             await self.drone.offboard.set_position_ned(
                 PositionNedYaw(north_m, east_m, down_m, yaw_deg))
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.005)
 
         async def send_setpoints_loop():
             """Continuously sends the specified position setpoints."""
@@ -56,7 +56,7 @@ class CommandExecutor:
                 while True:
                     await self.drone.offboard.set_position_ned(
                         PositionNedYaw(north_m, east_m, down_m, yaw_deg))
-                    await asyncio.sleep(0.1) # Send setpoints at 10Hz
+                    await asyncio.sleep(0.005) # Send setpoints at 10Hz
             except asyncio.CancelledError:
                 logger.info("Offboard setpoint stream cancelled.")
             except Exception as e:
@@ -98,7 +98,7 @@ class CommandExecutor:
                 )
             else:
                 await self._start_offboard_setpoint_stream(0.0, 0.0, -target_altitude_m, 0.0) # Fallback to default alt
-            await asyncio.sleep(0.5) # Give it a moment to start
+            await asyncio.sleep(0.05) # Give it a moment to start
 
         logger.info("Trying to set Offboard mode...")
         try:
