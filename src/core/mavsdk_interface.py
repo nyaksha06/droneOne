@@ -165,13 +165,26 @@ class MAVSDKInterface:
         :param stream_func: The MAVSDK telemetry stream function (e.g., self.drone.telemetry.position).
         :return: The latest value from the stream, or None if no value yet.
         """
+        stream_generator = stream_func() # Get the async generator object
         try:
-            async for value in stream_func():
-                return value
+            value = await stream_generator.__anext__() # Get the first value
+            return value
+        except StopAsyncIteration: # Stream is empty or done
+            return None
         except Exception as e:
             logger.debug(f"Could not read from stream {stream_func.__name__}: {e}")
             return None
-        # Removed the problematic finally block that tried to access _generator
+        finally:
+            # Explicitly close the async generator to prevent resource leaks
+            try:
+                await stream_generator.aclose()
+            except RuntimeError as e:
+                # This can happen if the event loop is already closing or generator is already closed.
+                # It's an "exception ignored" type of warning from asyncio/grpc.
+                logger.debug(f"Error closing stream generator for {stream_func.__name__}: {e}")
+            except Exception as e:
+                logger.warning(f"Unexpected error during stream generator aclose for {stream_func.__name__}: {e}")
+
 
     # --- Old Telemetry Subscription Methods (No longer actively used by main_controller) ---
     # These are kept for completeness but SimTelemetryProcessor now uses _read_stream_value
