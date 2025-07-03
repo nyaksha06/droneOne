@@ -135,8 +135,8 @@ class DroneState:
              telemetry_summary.append(f"Lat/Lon: {position_data['latitude_deg']:.4f},{position_data['longitude_deg']:.4f}")
         if position_ned_data.get("north_m") is not None:
             telemetry_summary.append(f"NED Pos: N={position_ned_data['north_m']:.2f}m, E={position_ned_data['east_m']:.2f}m, D={position_ned_data['down_m']:.2f}m")
-        if velocity_data.get("ground_speed_m_s") is not None:
-            telemetry_summary.append(f"Ground Speed: {velocity_data['ground_speed_m_s']:.2f}m/s")
+        # if velocity_data.get("ground_speed_m_s") is not None:
+        #     telemetry_summary.append(f"Ground Speed: {velocity_data['ground_speed_m_s']:.2f}m/s")
         if battery_data.get("remaining_percent") is not None:
             telemetry_summary.append(f"Battery: {battery_data['remaining_percent']:.1f}%")
         

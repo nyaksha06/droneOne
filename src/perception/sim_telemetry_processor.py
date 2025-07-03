@@ -56,7 +56,7 @@ class SimTelemetryProcessor:
                 "north_m_s": pos_vel_ned_data.velocity.north_m_s,
                 "east_m_s": pos_vel_ned_data.velocity.east_m_s,
                 "down_m_s": pos_vel_ned_data.velocity.down_m_s,
-                "ground_speed_m_s": pos_vel_ned_data.velocity.ground_speed_m_s,
+                # "ground_speed_m_s": pos_vel_ned_data.velocity.ground_speed_m_s,
             }
         else:
             processed_data["position_ned"] = {}
@@ -76,7 +76,7 @@ class SimTelemetryProcessor:
         # In-air status
         in_air_data = await self.mavsdk_interface._read_stream_value(self.mavsdk_interface.drone.telemetry.in_air)
         if in_air_data:
-            processed_data["is_flying"] = in_air_data.is_in_air # Use is_in_air boolean
+            processed_data["is_flying"] = in_air_data.in_air # Use is_in_air boolean
             self._in_air = in_air_data.is_in_air # Update internal flag
         else:
             processed_data["is_flying"] = False
