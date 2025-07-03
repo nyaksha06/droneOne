@@ -20,7 +20,7 @@ class MAVSDKInterface:
         self.drone = System()
         self._system_address = system_address
         self.is_connected = False
-        self._telemetry_tasks = []
+        self._telemetry_tasks = [] # To keep track of active telemetry subscription tasks
         logger.info(f"MAVSDKInterface initialized for system address: {self._system_address}")
 
     async def connect(self):
@@ -32,16 +32,24 @@ class MAVSDKInterface:
             await self.drone.connect(system_address=self._system_address)
             logger.info("MAVSDK connection initiated. Waiting for state...")
 
-            async for health in self.drone.telemetry.health():
-                if health.is_global_position_ok and health.is_home_position_ok:
-                    logger.info("Drone global and home position are OK. Connected and Ready!")
+            async for state in self.drone.core.connection_state():
+                if state.is_connected:
+                    logger.info("Drone connected!")
                     self.is_connected = True
-                    return True
-                else:
-                    logger.info(f"Waiting for drone health: Global Pos OK={health.is_global_position_ok}, Home Pos OK={health.is_home_position_ok}. Full health: {health}")
-                    await asyncio.sleep(1)
+                    break
+                await asyncio.sleep(0.1)
+
+            # Wait for the drone to be ready (e.g., armed, in air, health)
+            logger.info("Waiting for drone to be ready...")
+            async for health in self.drone.telemetry.health():
+                if health.is_global_position_ok and health.is_home_position_ok and health.is_gyrometer_calibration_ok and health.is_accelerometer_calibration_ok and health.is_magnetometer_calibration_ok:
+                    logger.info("Drone health is good and ready to fly.")
+                    break
+                await asyncio.sleep(0.5)
+
+            return True
         except Exception as e:
-            logger.error(f"Error during drone connection: {e}")
+            logger.error(f"Failed to connect to drone: {e}")
             self.is_connected = False
             return False
         return False
@@ -56,8 +64,10 @@ class MAVSDKInterface:
             try:
                 await task
             except asyncio.CancelledError:
-                pass
+                pass # Expected
         self._telemetry_tasks.clear()
+        # MAVSDK System object doesn't have a direct disconnect() method
+        # Disconnecting the loop or program termination handles it.
         self.is_connected = False
         logger.info("Disconnected from drone.")
 
@@ -141,8 +151,6 @@ class MAVSDKInterface:
         """
         logger.info(f"Going to Lat: {latitude_deg:.6f}, Lon: {longitude_deg:.6f}, Alt: {altitude_m:.2f}m, Yaw: {yaw_deg:.2f}deg...")
         try:
-            # MAVSDK's goto_location uses relative altitude by default if not specified otherwise.
-            # It also has a 'speed_m_s' parameter if you want to control speed.
             await self.drone.action.goto_location(latitude_deg, longitude_deg, altitude_m, yaw_deg)
             logger.info("Goto location command sent.")
             return True
@@ -163,12 +171,11 @@ class MAVSDKInterface:
         except Exception as e:
             logger.debug(f"Could not read from stream {stream_func.__name__}: {e}")
             return None
-        finally:
-            if stream_func._generator is not None:
-                try:
-                    stream_func._generator.close()
-                except RuntimeError:
-                    pass
+        # Removed the problematic finally block that tried to access _generator
+
+    # --- Old Telemetry Subscription Methods (No longer actively used by main_controller) ---
+    # These are kept for completeness but SimTelemetryProcessor now uses _read_stream_value
+    # to get data directly.
 
     async def subscribe_position(self, handler):
         """Subscribes to global position telemetry."""
