@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from src.core.mavsdk_interface import MAVSDKInterface
 from src.core.command_arbitrator import CommandArbitrator 
 from src.core.command_executor import CommandExecutor     
-from src.perception.simple_telemetry import SimTelemetryProcessor
+from perception.sim_telemetry_processor import SimTelemetryProcessor
 from src.perception.camera_processor import CameraProcessor
 from src.state_management.drone_state import DroneState
 from src.decision_making.llm_engine import LLMDecisionEngine
