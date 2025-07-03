@@ -75,9 +75,9 @@ class SimTelemetryProcessor:
 
         # In-air status
         in_air_data = await self.mavsdk_interface._read_stream_value(self.mavsdk_interface.drone.telemetry.in_air)
-        if in_air_data:
-            processed_data["is_flying"] = in_air_data.is_in_air # Use is_in_air boolean
-            self._in_air = in_air_data.is_in_air # Update internal flag
+        if in_air_data is not None: # in_air_data is directly a boolean in MAVSDK 1.3.0
+            processed_data["is_flying"] = in_air_data # FIXED: Use in_air_data directly
+            self._in_air = in_air_data # Update internal flag
         else:
             processed_data["is_flying"] = False
 
