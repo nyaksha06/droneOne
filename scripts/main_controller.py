@@ -3,12 +3,12 @@ import sys
 import os
 import logging
 
-
+# Configure logging for better visibility across all modules
 logging.basicConfig(level=logging.INFO, stream=sys.stdout,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-
+# Add the parent directory (drone_control_software) to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.core.mavsdk_interface import MAVSDKInterface
@@ -73,7 +73,6 @@ async def main():
     # Initialize components
     mavsdk_interface = MAVSDKInterface(system_address=SITL_SYSTEM_ADDRESS)
     
-    # MODIFIED: Pass mavsdk_interface to SimTelemetryProcessor
     telemetry_processor = SimTelemetryProcessor(mavsdk_interface=mavsdk_interface) 
     
     camera_processor = CameraProcessor()
@@ -96,8 +95,6 @@ async def main():
     )
     drone_state.set_mission_objectives(overall_mission_objective) 
     
-  
-
     # Start human input task
     human_input_task = asyncio.ensure_future(get_human_input_task())
 
@@ -111,8 +108,7 @@ async def main():
     
     # --- Control flags for human/LLM interaction ---
     mission_finished = False
-    # Start with human control active. LLM will not be queried initially.
-    # command_arbitrator.set_human_control({"action": "pause_llm", "reason": "System startup, human control active."})
+    # command_arbitrator is initialized with human control active by default
     drone_state.set_human_control_status(True) # Inform drone_state
 
     # Flags to manage trigger and LLM following state
@@ -132,7 +128,7 @@ async def main():
                     await command_executor.execute_command(human_cmd)
                     drone_state.set_last_executed_command(human_cmd)
                     # If human lands, they implicitly take control back, LLM pauses
-                    command_arbitrator.set_human_control({"action": "pause_llm", "reason": "Human landed drone."})
+                    command_arbitrator.set_human_control_active(True) 
                     drone_state.set_human_control_status(True)
                     llm_should_be_active = False
                     llm_is_currently_following = False
@@ -140,19 +136,19 @@ async def main():
                     await command_executor.execute_command(human_cmd)
                     drone_state.set_last_executed_command(human_cmd)
                     # If human disarms, they implicitly take control back, LLM pauses
-                    command_arbitrator.set_human_control({"action": "pause_llm", "reason": "Human disarmed drone."})
+                    command_arbitrator.set_human_control_active(True) 
                     drone_state.set_human_control_status(True)
                     llm_should_be_active = False
                     llm_is_currently_following = False
                 elif human_cmd["action"] == "release":
-                    command_arbitrator.release_human_control()
+                    command_arbitrator.release_human_control() # This sets _human_control_active to False internally
                     drone_state.set_human_control_status(False) # Inform drone_state
                     llm_should_be_active = True # Allow LLM to make decisions now
                     logger.info("Human released control. LLM will now be queried if a trigger is active.")
                     llm_loop_count = llm_decision_interval_loops - 1 # Trigger immediate LLM decision
                 elif human_cmd["action"] == "stop_follow":
-                    command_arbitrator.set_human_control({"action": "do_nothing", "reason": "Human stopped LLM follow."})
-                    drone_state.set_human_control_status(True) # Human takes back control
+                    command_arbitrator.set_human_control_active(True) # Human takes back control
+                    drone_state.set_human_control_status(True) # Inform drone_state
                     drone_state.set_llm_following_status(False) # LLM is no longer following
                     llm_is_currently_following = False
                     llm_should_be_active = False # LLM pauses until new 'release'
@@ -172,24 +168,23 @@ async def main():
             await camera_processor.process_camera_feed()
 
             # 2. Get processed data from perception units
-            # MODIFIED: Call get_processed_data() on telemetry_processor
             processed_telemetry = await telemetry_processor.get_processed_data() 
             visual_insights = camera_processor.get_visual_insights()
 
             # 3. Update central drone state
             drone_state.update_telemetry(processed_telemetry)
             drone_state.update_visual_insights(visual_insights)
-            # MODIFIED: Update flight mode from processed telemetry
             drone_state.update_flight_mode(processed_telemetry.get("flight_mode", "UNKNOWN"))
             
             # Update drone_state's internal flags for LLM prompting
-            drone_state.set_human_control_status(command_arbitrator._human_control_active)
+            drone_state.set_human_control_status(command_arbitrator.human_control_active) # Use property
             drone_state.set_llm_following_status(llm_is_currently_following)
 
             # --- LLM Decision Logic ---
             # Query LLM only if LLM should be active AND it's time for a new decision
             # (i.e., human has released control, and either a trigger is active or LLM is already following)
-            if llm_should_be_active and (llm_loop_count % llm_decision_interval_loops) == 0:
+            if llm_should_be_active and \
+               llm_loop_count % llm_decision_interval_loops == 0:
                 
                 # Check for active trigger (detected object)
                 current_detected_objects = visual_insights.get("detected_objects", [])
@@ -216,8 +211,8 @@ async def main():
                             # If LLM proposes land/disarm, it means it's ending its autonomous control
                             llm_is_currently_following = False
                             llm_should_be_active = False # LLM pauses after this action
-                            command_arbitrator.set_human_control({"action": "pause_llm", "reason": "LLM completed its task."})
-                            drone_state.set_human_control_status(True) # Human control implicitly re-activated
+                            command_arbitrator.set_human_control_active(True) # LLM is done, human regains control
+                            drone_state.set_human_control_status(True) # Inform drone_state
                     else:
                         logger.warning("LLM provided no valid action this cycle. Last valid LLM action remains in effect for arbitration.")
                 else:
@@ -235,7 +230,7 @@ async def main():
             # 5. Execute command (simplified logic for this new paradigm)
             # If human control is active, human commands are handled directly at the top.
             # If LLM is active, its proposed command is executed.
-            if not command_arbitrator._human_control_active: # Only execute LLM commands if human has released
+            if not command_arbitrator.human_control_active: # Use property
                 success = await command_executor.execute_command(final_command)
                 if success:
                     drone_state.set_last_executed_command(final_command)
@@ -251,7 +246,7 @@ async def main():
                 await command_executor.execute_command({"action": "land", "reason": "Emergency: Critical Battery."})
                 drone_state.set_last_executed_command({"action": "land", "reason": "Emergency: Critical Battery."})
                 # After emergency land, return control to human and stop LLM follow
-                command_arbitrator.set_human_control({"action": "pause_llm", "reason": "Emergency landing."})
+                command_arbitrator.set_human_control_active(True) 
                 drone_state.set_human_control_status(True)
                 drone_state.set_llm_following_status(False)
                 llm_is_currently_following = False
@@ -269,11 +264,8 @@ async def main():
 
     # --- Cleanup ---
     logger.info("Performing final cleanup and disconnecting from drone.")
-    # Note: command_executor._offboard_setpoint_task needs to be managed if 'follow_target'
-    # involves continuous offboard setpoints. For now, it's not explicitly stopped here.
-    # If a continuous offboard stream is started by command_executor, ensure it's stopped.
-    # Example: if command_executor._offboard_setpoint_task and not command_executor._offboard_setpoint_task.done():
-    #             await command_executor._stop_offboard_setpoint_stream()
+    if command_executor._offboard_setpoint_task and not command_executor._offboard_setpoint_task.done():
+        await command_executor._stop_offboard_setpoint_stream()
     human_input_task.cancel()
     try:
         await human_input_task
