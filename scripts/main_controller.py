@@ -29,6 +29,8 @@ async def get_human_input_task():
     This runs in a separate thread/task to not block the main asyncio loop.
     """
     logger.info("\n--- Human Control Input ---")
+    logger.info("Type 'takeoff <altitude_m>' to takeoff (e.g., 'takeoff 10').") # NEW
+    logger.info("Type 'goto <north_m> <east_m> <altitude_m>' to go to a relative position (e.g., 'goto 10 5 10').") # NEW
     logger.info("Type 'land' to land the drone.")
     logger.info("Type 'disarm' to disarm the drone.")
     logger.info("Type 'release' to let LLM take control (on trigger).")
@@ -42,25 +44,40 @@ async def get_human_input_task():
     while True:
         try:
             user_input = await loop.run_in_executor(None, sys.stdin.readline)
-            command_text = user_input.strip().lower()
+            command_parts = user_input.strip().lower().split()
+            action = command_parts[0] if command_parts else ""
 
-            if command_text == "exit":
+            if action == "exit":
                 await _human_command_queue.put({"action": "exit"})
                 break
-            elif command_text == "land":
+            elif action == "land":
                 await _human_command_queue.put({"action": "land", "reason": "Human override: manual land."})
-            elif command_text == "disarm":
+            elif action == "disarm":
                 await _human_command_queue.put({"action": "disarm", "reason": "Human override: manual disarm."})
-            elif command_text == "release":
+            elif action == "release":
                 await _human_command_queue.put({"action": "release", "reason": "Human released control."})
-            elif command_text == "stop_follow":
+            elif action == "stop_follow":
                 await _human_command_queue.put({"action": "stop_follow", "reason": "Human stopped LLM follow."})
-            elif command_text == "simulate_person":
+            elif action == "simulate_person":
                 await _human_command_queue.put({"action": "simulate_person", "reason": "Human triggered mock person detection."})
-            elif command_text == "clear_detection":
+            elif action == "clear_detection":
                 await _human_command_queue.put({"action": "clear_detection", "reason": "Human cleared mock detection."})
+            elif action == "takeoff": # NEW
+                try:
+                    altitude_m = float(command_parts[1])
+                    await _human_command_queue.put({"action": "takeoff", "parameters": {"altitude_m": altitude_m}, "reason": f"Human commanded takeoff to {altitude_m}m."})
+                except (IndexError, ValueError):
+                    logger.warning("Invalid 'takeoff' command. Usage: 'takeoff <altitude_m>' (e.g., 'takeoff 10').")
+            elif action == "goto": # NEW
+                try:
+                    north_m = float(command_parts[1])
+                    east_m = float(command_parts[2])
+                    altitude_m = float(command_parts[3])
+                    await _human_command_queue.put({"action": "goto_location", "parameters": {"north_m": north_m, "east_m": east_m, "altitude_m": altitude_m}, "reason": f"Human commanded goto N:{north_m} E:{east_m} Alt:{altitude_m}."})
+                except (IndexError, ValueError):
+                    logger.warning("Invalid 'goto' command. Usage: 'goto <north_m> <east_m> <altitude_m>' (e.g., 'goto 10 5 10').")
             else:
-                logger.warning(f"Unknown human command: '{command_text}'.")
+                logger.warning(f"Unknown human command: '{' '.join(command_parts)}'.")
         except Exception as e:
             logger.error(f"Error reading human input: {e}")
             break
@@ -108,7 +125,7 @@ async def main():
     
     # --- Control flags for human/LLM interaction ---
     mission_finished = False
-    # command_arbitrator is initialized with human control active by default
+    command_arbitrator.set_human_control_active(True) 
     drone_state.set_human_control_status(True) # Inform drone_state
 
     # Flags to manage trigger and LLM following state
@@ -120,33 +137,27 @@ async def main():
             # --- Handle Human Commands ---
             if not _human_command_queue.empty():
                 human_cmd = await _human_command_queue.get()
-                if human_cmd["action"] == "exit":
+                action_type = human_cmd["action"]
+
+                if action_type == "exit":
                     logger.info("Exit command received. Shutting down...")
                     mission_finished = True
                     break
-                elif human_cmd["action"] == "land":
+                elif action_type in ["land", "disarm", "takeoff", "goto_location"]: # MODIFIED: Added takeoff, goto_location
                     await command_executor.execute_command(human_cmd)
                     drone_state.set_last_executed_command(human_cmd)
-                    # If human lands, they implicitly take control back, LLM pauses
+                    # If human issues a direct flight command, they implicitly take control
                     command_arbitrator.set_human_control_active(True) 
                     drone_state.set_human_control_status(True)
-                    llm_should_be_active = False
-                    llm_is_currently_following = False
-                elif human_cmd["action"] == "disarm":
-                    await command_executor.execute_command(human_cmd)
-                    drone_state.set_last_executed_command(human_cmd)
-                    # If human disarms, they implicitly take control back, LLM pauses
-                    command_arbitrator.set_human_control_active(True) 
-                    drone_state.set_human_control_status(True)
-                    llm_should_be_active = False
-                    llm_is_currently_following = False
-                elif human_cmd["action"] == "release":
+                    llm_should_be_active = False # LLM pauses
+                    llm_is_currently_following = False # Stop any LLM follow
+                elif action_type == "release":
                     command_arbitrator.release_human_control() # This sets _human_control_active to False internally
                     drone_state.set_human_control_status(False) # Inform drone_state
                     llm_should_be_active = True # Allow LLM to make decisions now
                     logger.info("Human released control. LLM will now be queried if a trigger is active.")
                     llm_loop_count = llm_decision_interval_loops - 1 # Trigger immediate LLM decision
-                elif human_cmd["action"] == "stop_follow":
+                elif action_type == "stop_follow":
                     command_arbitrator.set_human_control_active(True) # Human takes back control
                     drone_state.set_human_control_status(True) # Inform drone_state
                     drone_state.set_llm_following_status(False) # LLM is no longer following
@@ -155,10 +166,10 @@ async def main():
                     logger.info("Human stopped LLM-driven follow. Control returned to human.")
                     await command_executor.execute_command({"action": "do_nothing", "reason": "Human stopped follow."})
                     drone_state.set_last_executed_command({"action": "do_nothing", "reason": "Human stopped follow."})
-                elif human_cmd["action"] == "simulate_person":
+                elif action_type == "simulate_person":
                     camera_processor.simulate_detection(object_type="person", distance_m=15.0, relative_position="ahead_center")
                     logger.info("Simulated person detection triggered.")
-                elif human_cmd["action"] == "clear_detection":
+                elif action_type == "clear_detection":
                     camera_processor.clear_detections()
                     logger.info("Simulated detection cleared.")
                 else:
@@ -177,7 +188,7 @@ async def main():
             drone_state.update_flight_mode(processed_telemetry.get("flight_mode", "UNKNOWN"))
             
             # Update drone_state's internal flags for LLM prompting
-            drone_state.set_human_control_status(command_arbitrator.human_control_active) # Use property
+            drone_state.set_human_control_status(command_arbitrator.human_control_active) 
             drone_state.set_llm_following_status(llm_is_currently_following)
 
             # --- LLM Decision Logic ---
@@ -224,20 +235,18 @@ async def main():
             
             llm_loop_count += 1 
 
-            # 4. Arbitrate command
-            final_command = command_arbitrator.arbitrate_command(last_llm_proposed_action)
-            
-            # 5. Execute command (simplified logic for this new paradigm)
+            # 4. Arbitrate command - LLM's command is only arbitrated if human control is NOT active
             # If human control is active, human commands are handled directly at the top.
             # If LLM is active, its proposed command is executed.
-            if not command_arbitrator.human_control_active: # Use property
+            if not command_arbitrator.human_control_active: 
+                final_command = command_arbitrator.arbitrate_command(last_llm_proposed_action)
                 success = await command_executor.execute_command(final_command)
                 if success:
                     drone_state.set_last_executed_command(final_command)
                 else:
                     logger.error(f"Command execution failed for: {final_command.get('action')}. Not updating last executed command.")
             else:
-                logger.debug(f"Human control active. Skipping LLM command execution: {final_command.get('action')}")
+                logger.debug(f"Human control active. LLM commands are not being executed.")
 
             # Optional: Check for critical battery
             if telemetry_processor.is_battery_critical(CRITICAL_BATTERY_PERCENTAGE):
