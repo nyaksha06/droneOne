@@ -166,8 +166,8 @@ class CommandExecutor:
                     await asyncio.sleep(0.5) # Give it a moment to stabilize
                 success = await self.mavsdk_interface.land()
                 # After landing, disarm
-                if success:
-                    await self.mavsdk_interface.disarm()
+                # if success:
+                #     await self.mavsdk_interface.disarm()
                 return success
 
             elif action == "disarm":
