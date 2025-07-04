@@ -175,24 +175,19 @@ class DroneState:
         if state["human_control_active"]:
             llm_role_guidance = "Human has control. Output: {'action': 'do_nothing'}"
         elif state["llm_following_active"]:
-            if primary_detected_object and "absolute_position_ned" in primary_detected_object:
-                target_pos_ned = primary_detected_object["absolute_position_ned"]
-                llm_role_guidance = (
-                    f"Following '{primary_detected_object.get('type', 'N/A')}' (ID:{primary_detected_object.get('id', 'N/A')}) @N{target_pos_ned.get('north_m', 'N/A'):.1f} E{target_pos_ned.get('east_m', 'N/A'):.1f} D{target_pos_ned.get('down_m', 'N/A'):.1f}m. "
-                    f"Maintain follow. If target lost, suggest 'do_nothing' or 'land'."
-                )
-            else:
-                llm_role_guidance = "Target lost. Suggest 'do_nothing' or 'land'."
-        elif primary_detected_object and "absolute_position_ned" in primary_detected_object:
-            target_pos_ned = primary_detected_object["absolute_position_ned"]
+            # LLM is already following, just needs to affirm or stop
             llm_role_guidance = (
-                f"New trigger: '{primary_detected_object.get('type', 'N/A')}' (ID:{primary_detected_object.get('id', 'N/A')}) @N{target_pos_ned.get('north_m', 'N/A'):.1f} E{target_pos_ned.get('east_m', 'N/A'):.1f} D{target_pos_ned.get('down_m', 'N/A'):.1f}m. "
-                f"Human released control. Propose 'follow_target' or 'do_nothing'."
+                f"You are following a target. Continue to follow by outputting 'follow_target'. "
+                f"If target lost or situation changes, suggest 'do_nothing' or 'land'."
+            )
+        elif primary_detected_object: # Only check for primary_detected_object, not its specific NED
+            llm_role_guidance = (
+                f"New trigger detected. Human released control. Propose 'follow_target' to track it, or 'do_nothing'."
             )
         else:
             llm_role_guidance = "Human released control, no trigger. Maintain position ('do_nothing') or 'land'."
 
-        # JSON Schema (kept explicit for clarity to the LLM about expected format)
+        # JSON Schema (simplified for follow_target)
         json_schema = (
             f"```json\n"
             f"{{\n"
@@ -201,12 +196,7 @@ class DroneState:
             f'    "altitude_m"?: float, // for takeoff/goto_location\n'
             f'    "north_m"?: float, // for goto_location\n'
             f'    "east_m"?: float,  // for goto_location\n'
-            f'    "target_id"?: string, // for follow_target\n'
-            f'    "target_north_m"?: float, // for follow_target\n'
-            f'    "target_east_m"?: float,  // for follow_target\n'
-            f'    "target_down_m"?: float,  // for follow_target\n'
-            f'    "follow_distance_m"?: float, // for follow_target\n'
-            f'    "follow_altitude_m"?: float // for follow_target\n'
+            f'    "target_id"?: string // for follow_target (optional, if multiple targets)\n'
             f'  }},\n'
             f'  "reason"?: string\n'
             f"}}\n"
