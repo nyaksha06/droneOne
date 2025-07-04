@@ -29,13 +29,13 @@ async def get_human_input_task():
     This runs in a separate thread/task to not block the main asyncio loop.
     """
     logger.info("\n--- Human Control Input ---")
-    logger.info("Type 'takeoff <altitude_m>' to takeoff (e.g., 'takeoff 10').") # NEW
-    logger.info("Type 'goto <north_m> <east_m> <altitude_m>' to go to a relative position (e.g., 'goto 10 5 10').") # NEW
+    logger.info("Type 'takeoff <altitude_m>' to takeoff (e.g., 'takeoff 10').")
+    logger.info("Type 'goto <north_m> <east_m> <altitude_m>' to go to a relative position (e.g., 'goto 10 5 10').")
     logger.info("Type 'land' to land the drone.")
     logger.info("Type 'disarm' to disarm the drone.")
     logger.info("Type 'release' to let LLM take control (on trigger).")
     logger.info("Type 'stop_follow' to stop LLM-driven following.")
-    logger.info("Type 'simulate_person' to trigger a mock person detection.")
+    logger.info("Type 'simulate_person <N> <E> <D> <vel_N> <vel_E> <vel_D>' to trigger a mock person detection with initial NED position and velocity (e.g., 'simulate_person 20 0 0 0.5 0 0').") # MODIFIED INSTRUCTION
     logger.info("Type 'clear_detection' to clear mock detection.")
     logger.info("Type 'exit' to stop the script.")
     logger.info("---------------------------\n")
@@ -58,17 +58,15 @@ async def get_human_input_task():
                 await _human_command_queue.put({"action": "release", "reason": "Human released control."})
             elif action == "stop_follow":
                 await _human_command_queue.put({"action": "stop_follow", "reason": "Human stopped LLM follow."})
-            elif action == "simulate_person":
-                await _human_command_queue.put({"action": "simulate_person", "reason": "Human triggered mock person detection."})
             elif action == "clear_detection":
                 await _human_command_queue.put({"action": "clear_detection", "reason": "Human cleared mock detection."})
-            elif action == "takeoff": # NEW
+            elif action == "takeoff":
                 try:
                     altitude_m = float(command_parts[1])
                     await _human_command_queue.put({"action": "takeoff", "parameters": {"altitude_m": altitude_m}, "reason": f"Human commanded takeoff to {altitude_m}m."})
                 except (IndexError, ValueError):
                     logger.warning("Invalid 'takeoff' command. Usage: 'takeoff <altitude_m>' (e.g., 'takeoff 10').")
-            elif action == "goto": # NEW
+            elif action == "goto":
                 try:
                     north_m = float(command_parts[1])
                     east_m = float(command_parts[2])
@@ -76,6 +74,28 @@ async def get_human_input_task():
                     await _human_command_queue.put({"action": "goto_location", "parameters": {"north_m": north_m, "east_m": east_m, "altitude_m": altitude_m}, "reason": f"Human commanded goto N:{north_m} E:{east_m} Alt:{altitude_m}."})
                 except (IndexError, ValueError):
                     logger.warning("Invalid 'goto' command. Usage: 'goto <north_m> <east_m> <altitude_m>' (e.g., 'goto 10 5 10').")
+            elif action == "simulate_person": # MODIFIED: New parsing for simulate_person
+                try:
+                    initial_north_m = float(command_parts[1])
+                    initial_east_m = float(command_parts[2])
+                    initial_down_m = float(command_parts[3])
+                    velocity_north_m_s = float(command_parts[4])
+                    velocity_east_m_s = float(command_parts[5])
+                    velocity_down_m_s = float(command_parts[6])
+                    await _human_command_queue.put({
+                        "action": "simulate_person",
+                        "parameters": {
+                            "initial_north_m": initial_north_m,
+                            "initial_east_m": initial_east_m,
+                            "initial_down_m": initial_down_m,
+                            "velocity_north_m_s": velocity_north_m_s,
+                            "velocity_east_m_s": velocity_east_m_s,
+                            "velocity_down_m_s": velocity_down_m_s
+                        },
+                        "reason": "Human triggered mock person detection with custom parameters."
+                    })
+                except (IndexError, ValueError):
+                    logger.warning("Invalid 'simulate_person' command. Usage: 'simulate_person <N> <E> <D> <vel_N> <vel_E> <vel_D>' (e.g., 'simulate_person 20 0 0 0.5 0 0').")
             else:
                 logger.warning(f"Unknown human command: '{' '.join(command_parts)}'.")
         except Exception as e:
@@ -143,7 +163,7 @@ async def main():
                     logger.info("Exit command received. Shutting down...")
                     mission_finished = True
                     break
-                elif action_type in ["land", "disarm", "takeoff", "goto_location"]: # MODIFIED: Added takeoff, goto_location
+                elif action_type in ["land", "disarm", "takeoff", "goto_location"]:
                     await command_executor.execute_command(human_cmd)
                     drone_state.set_last_executed_command(human_cmd)
                     # If human issues a direct flight command, they implicitly take control
@@ -166,9 +186,18 @@ async def main():
                     logger.info("Human stopped LLM-driven follow. Control returned to human.")
                     await command_executor.execute_command({"action": "do_nothing", "reason": "Human stopped follow."})
                     drone_state.set_last_executed_command({"action": "do_nothing", "reason": "Human stopped follow."})
-                elif action_type == "simulate_person":
-                    camera_processor.simulate_detection(object_type="person", distance_m=15.0, relative_position="ahead_center")
-                    logger.info("Simulated person detection triggered.")
+                elif action_type == "simulate_person": # MODIFIED: Handle new parameters
+                    params = human_cmd.get("parameters", {})
+                    camera_processor.simulate_detection(
+                        object_type="person",
+                        initial_north_m=params.get("initial_north_m", 0.0),
+                        initial_east_m=params.get("initial_east_m", 0.0),
+                        initial_down_m=params.get("initial_down_m", 0.0),
+                        velocity_north_m_s=params.get("velocity_north_m_s", 0.0),
+                        velocity_east_m_s=params.get("velocity_east_m_s", 0.0),
+                        velocity_down_m_s=params.get("velocity_down_m_s", 0.0)
+                    )
+                    logger.info("Simulated person detection triggered with custom parameters.")
                 elif action_type == "clear_detection":
                     camera_processor.clear_detections()
                     logger.info("Simulated detection cleared.")
