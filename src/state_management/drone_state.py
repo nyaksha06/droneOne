@@ -127,20 +127,18 @@ class DroneState:
         # Build telemetry summary string from the dictionary
         telemetry_summary = []
         if position_data.get("relative_altitude_m") is not None:
-            telemetry_summary.append(f"Rel Alt: {position_data['relative_altitude_m']:.2f}m")
-        if position_data.get("latitude_deg") is not None and position_data.get("longitude_deg") is not None:
-             telemetry_summary.append(f"Lat/Lon: {position_data['latitude_deg']:.4f},{position_data['longitude_deg']:.4f}")
+            telemetry_summary.append(f"Alt: {position_data['relative_altitude_m']:.1f}m")
         if position_ned_data.get("north_m") is not None:
-            telemetry_summary.append(f"NED Pos: N={position_ned_data['north_m']:.2f}m, E={position_ned_data['east_m']:.2f}m, D={position_ned_data['down_m']:.2f}m")
+            telemetry_summary.append(f"Pos(NED): N{position_ned_data['north_m']:.1f} E{position_ned_data['east_m']:.1f} D{position_ned_data['down_m']:.1f}m")
         if velocity_data.get("ground_speed_m_s") is not None:
-            telemetry_summary.append(f"Ground Speed: {velocity_data['ground_speed_m_s']:.2f}m/s")
+            telemetry_summary.append(f"Speed: {velocity_data['ground_speed_m_s']:.1f}m/s")
         if battery_data.get("remaining_percent") is not None:
-            telemetry_summary.append(f"Battery: {battery_data['remaining_percent']:.1f}%")
+            telemetry_summary.append(f"Bat: {battery_data['remaining_percent']:.0f}%")
         
-        telemetry_str = ", ".join(telemetry_summary) if telemetry_summary else "Telemetry data unavailable."
+        telemetry_str = ", ".join(telemetry_summary) if telemetry_summary else "N/A"
 
         # Build visual insights summary and identify primary detected object
-        visual_summary = []
+        visual_summary_items = []
         primary_detected_object = None
         detected_objects = state.get("visual_insights", {}).get("detected_objects", [])
         
@@ -148,107 +146,74 @@ class DroneState:
             primary_detected_object = detected_objects[0]
             for obj in detected_objects:
                 obj_type = obj.get('type')
-                obj_id = obj.get('id', 'N/A') # NEW: Include ID
-                obj_pos_ned = obj.get('absolute_position_ned', {}) # NEW: Get absolute NED
-                
-                visual_summary.append(
-                    f"{obj_type} (ID: {obj_id}) at NED N:{obj_pos_ned.get('north_m', 'N/A'):.2f}, E:{obj_pos_ned.get('east_m', 'N/A'):.2f}, D:{obj_pos_ned.get('down_m', 'N/A'):.2f}"
+                obj_id = obj.get('id', 'N/A')
+                obj_pos_ned = obj.get('absolute_position_ned', {})
+                visual_summary_items.append(
+                    f"{obj_type} (ID:{obj_id}) @N{obj_pos_ned.get('north_m', 'N/A'):.1f} E{obj_pos_ned.get('east_m', 'N/A'):.1f} D{obj_pos_ned.get('down_m', 'N/A'):.1f}m"
                 )
-            visual_str = "Detected: " + "; ".join(visual_summary) + "."
+            visual_str = "Detected: " + "; ".join(visual_summary_items)
         else:
-            visual_str = "No objects currently detected."
+            visual_str = "No objects detected."
 
-        flying_status = "is flying" if is_flying else "is on the ground"
-        armed_status = "is armed" if is_armed else "is disarmed"
+        # --- NEW CONCISE LLM Prompt Logic ---
         
-        # --- LLM Prompt Logic for Trigger-Based Control ---
-        
-        # Base instruction for the LLM
+        # Core Instruction
         prompt_instruction = (
-            f"You are a drone control AI assistant. Your ONLY task is to output a single JSON object representing a drone command.\n"
-            f"You MUST NOT include any conversational text, explanations, or extraneous characters outside the JSON.\n\n"
+            f"You are a drone control AI. Output ONLY a JSON command.\n"
         )
 
-        # Contextual information for the LLM
+        # Current State Summary
         contextual_info = (
-            f"Current Drone Status:\n"
-            f"  - Drone {flying_status} and {armed_status}\n"
-            f"  - Flight Mode: {flight_mode}\n"
-            f"  - Telemetry: {telemetry_str}\n"
-            f"  - Visual Insights: {visual_str}\n" # This now includes target NED if detected
-            f"  - Last Executed Command: {state.get('last_executed_command', {}).get('action', 'none')} (Reason: {state.get('last_executed_command', {}).get('reason', 'N/A')})\n\n"
+            f"Drone Status: {'Flying' if is_flying else 'Grounded'}, {'Armed' if is_armed else 'Disarmed'}, Mode: {flight_mode}\n"
+            f"Telemetry: {telemetry_str}\n"
+            f"Visuals: {visual_str}\n"
+            f"Last Cmd: {state.get('last_executed_command', {}).get('action', 'none')}\n"
         )
 
-        # LLM's specific role based on human control and trigger status
+        # Role-based Guidance
         llm_role_guidance = ""
         if state["human_control_active"]:
-            llm_role_guidance = (
-                f"The human operator currently has full control. "
-                f"Your role is currently paused. Therefore, you MUST output 'do_nothing'."
-            )
+            llm_role_guidance = "Human has control. Output: {'action': 'do_nothing'}"
         elif state["llm_following_active"]:
-            # If LLM is already following, it needs to continue or adjust
             if primary_detected_object and "absolute_position_ned" in primary_detected_object:
                 target_pos_ned = primary_detected_object["absolute_position_ned"]
                 llm_role_guidance = (
-                    f"You are currently autonomously following target '{primary_detected_object.get('type', 'N/A')}' (ID: {primary_detected_object.get('id', 'N/A')}). "
-                    f"Its current absolute NED position is N:{target_pos_ned.get('north_m', 'N/A'):.2f}, E:{target_pos_ned.get('east_m', 'N/A'):.2f}, D:{target_pos_ned.get('down_m', 'N/A'):.2f}. "
-                    f"Based on current telemetry and visual insights, continue to maintain optimal follow parameters for this target. "
-                    f"If the target is lost or the situation changes, you may suggest 'do_nothing' or 'land'."
+                    f"Following '{primary_detected_object.get('type', 'N/A')}' (ID:{primary_detected_object.get('id', 'N/A')}) @N{target_pos_ned.get('north_m', 'N/A'):.1f} E{target_pos_ned.get('east_m', 'N/A'):.1f} D{target_pos_ned.get('down_m', 'N/A'):.1f}m. "
+                    f"Maintain follow. If target lost, suggest 'do_nothing' or 'land'."
                 )
             else:
-                llm_role_guidance = (
-                    f"You were following a target, but it is no longer detected. "
-                    f"You should now suggest 'do_nothing' or 'land'."
-                )
+                llm_role_guidance = "Target lost. Suggest 'do_nothing' or 'land'."
         elif primary_detected_object and "absolute_position_ned" in primary_detected_object:
-            # If a trigger is detected and human has released control, LLM needs to react to the trigger
             target_pos_ned = primary_detected_object["absolute_position_ned"]
             llm_role_guidance = (
-                f"A new activity/object ('{primary_detected_object.get('type', 'N/A')}' ID: {primary_detected_object.get('id', 'N/A')}) has been detected. "
-                f"Its current absolute NED position is N:{target_pos_ned.get('north_m', 'N/A'):.2f}, E:{target_pos_ned.get('east_m', 'N/A'):.2f}, D:{target_pos_ned.get('down_m', 'N/A'):.2f}. "
-                f"The human operator has released control, and you need to propose the optimal action to address this trigger. "
-                f"Consider actions like 'follow_target' to autonomously track it, or 'do_nothing' if no action is needed."
+                f"New trigger: '{primary_detected_object.get('type', 'N/A')}' (ID:{primary_detected_object.get('id', 'N/A')}) @N{target_pos_ned.get('north_m', 'N/A'):.1f} E{target_pos_ned.get('east_m', 'N/A'):.1f} D{target_pos_ned.get('down_m', 'N/A'):.1f}m. "
+                f"Human released control. Propose 'follow_target' or 'do_nothing'."
             )
         else:
-            # Human has released control, but no trigger is active (e.g., after a follow completes)
-            llm_role_guidance = (
-                f"The human operator has released control, but no specific activity or object is currently detected. "
-                f"You should maintain the drone's current position/altitude by outputting 'do_nothing', "
-                f"or suggest 'land' if appropriate."
-            )
+            llm_role_guidance = "Human released control, no trigger. Maintain position ('do_nothing') or 'land'."
 
-        # Define the JSON schema, including the new 'follow_target' action
+        # JSON Schema (kept explicit for clarity to the LLM about expected format)
         json_schema = (
-            f"The JSON object should conform to the following schema. Ensure all required parameters for the chosen action are present:\n"
             f"```json\n"
             f"{{\n"
             f'  "action": "takeoff" | "land" | "goto_location" | "follow_target" | "do_nothing",\n'
             f'  "parameters": {{\n'
-            f'    // Required for "takeoff":\n'
-            f'    "altitude_m"?: float, // Target altitude in meters (e.g., 20.0)\n'
-            f'\n'
-            f'    // Required for "goto_location" (relative to current position):\n'
-            f'    "north_m"?: float, // Distance North in meters (positive) or South (negative) (e.g., 10.0)\n'
-            f'    "east_m"?: float,  // Distance East in meters (positive) or West (negative) (e.g., 0.0)\n'
-            f'    "altitude_m"?: float // Target relative altitude in meters (e.g., 20.0)\n'
-            f'\n'
-            f'    // Required for "follow_target":\n'
-            f'    "target_id"?: string, // Identifier for the target to follow (e.g., "person_1", "vehicle_A")\n'
-            f'    "target_north_m"?: float, // NEW: Current North position of the target (absolute NED from home/start)\n'
-            f'    "target_east_m"?: float,  // NEW: Current East position of the target (absolute NED from home/start)\n'
-            f'    "target_down_m"?: float,  // NEW: Current Down position of the target (absolute NED from home/start)\n'
-            f'    "follow_distance_m"?: float, // Desired horizontal distance to maintain from the target in meters (e.g., 10.0)\n'
-            f'    "follow_altitude_m"?: float // NEW: Desired relative altitude to maintain while following (e.g., 15.0)\n'
+            f'    "altitude_m"?: float, // for takeoff/goto_location\n'
+            f'    "north_m"?: float, // for goto_location\n'
+            f'    "east_m"?: float,  // for goto_location\n'
+            f'    "target_id"?: string, // for follow_target\n'
+            f'    "target_north_m"?: float, // for follow_target\n'
+            f'    "target_east_m"?: float,  // for follow_target\n'
+            f'    "target_down_m"?: float,  // for follow_target\n'
+            f'    "follow_distance_m"?: float, // for follow_target\n'
+            f'    "follow_altitude_m"?: float // for follow_target\n'
             f'  }},\n'
-            f'  "reason"?: string // Optional human-readable reason for the action\n'
+            f'  "reason"?: string\n'
             f"}}\n"
-            f"```\n"
-            f"Only output the JSON object."
+            f"```"
         )
         
-        # Combine all parts of the prompt
-        prompt = f"{prompt_instruction}{contextual_info}{llm_role_guidance}\n\n{json_schema}"
+        prompt = f"{prompt_instruction}\n{contextual_info}\n{llm_role_guidance}\n\n{json_schema}"
         
         return prompt
 
