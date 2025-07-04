@@ -1,6 +1,6 @@
 import logging
 import sys
-import asyncio # Re-added for timestamp in get_current_state
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -14,10 +14,10 @@ class DroneState:
         """Initializes the DroneState with default empty values."""
         self._telemetry_data = {}
         self._visual_insights = {}
-        self._mission_objectives = "No specific mission objective set." 
-        self._current_flight_mode = "UNKNOWN" 
-        self._current_mission_stage = "INITIALIZING" 
-        self._mission_plan_steps = [] 
+        self._mission_objectives = "No specific mission objective set."
+        self._current_flight_mode = "UNKNOWN"
+        self._current_mission_stage = "INITIALIZING"
+        self._mission_plan_steps = []
         self._last_executed_command = {"action": "none", "reason": "System startup."}
         self._human_control_active = True
         self._llm_following_active = False
@@ -30,7 +30,6 @@ class DroneState:
         :param telemetry_data: Dictionary of processed telemetry from SimTelemetryProcessor.
         """
         self._telemetry_data = telemetry_data
-        # logger.debug(f"DroneState updated with telemetry: {telemetry_data.get('position', {}).get('relative_altitude_m')}")
 
     def update_visual_insights(self, visual_insights: dict):
         """
@@ -38,9 +37,8 @@ class DroneState:
         :param visual_insights: Dictionary of insights from CameraProcessor.
         """
         self._visual_insights = visual_insights
-        # logger.debug(f"DroneState updated with visual insights: {visual_insights.get('detected_objects')}")
 
-    def set_mission_objectives(self, objective: str, mission_steps: list = None): # Re-added
+    def set_mission_objectives(self, objective: str, mission_steps: list = None):
         """
         Sets the current mission objective and optionally a list of structured mission steps.
         """
@@ -61,7 +59,7 @@ class DroneState:
             logger.info(f"Mission stage updated: {self._current_mission_stage} -> {stage}")
             self._current_mission_stage = stage
 
-    def set_last_executed_command(self, command: dict): 
+    def set_last_executed_command(self, command: dict):
         """
         Sets the last command that was successfully executed by the drone.
         """
@@ -84,13 +82,12 @@ class DroneState:
             logger.info(f"LLM following status changed: {self._llm_following_active} -> {is_active}")
             self._llm_following_active = is_active
 
-    def update_flight_mode(self, flight_mode: str): 
+    def update_flight_mode(self, flight_mode: str):
         """
         Updates the current flight mode of the drone.
         :param flight_mode: The current flight mode string.
         """
         self._current_flight_mode = flight_mode
-        # logger.debug(f"Flight mode updated to: {flight_mode}")
 
     def get_current_state(self) -> dict:
         """
@@ -99,14 +96,14 @@ class DroneState:
         return {
             "telemetry": self._telemetry_data,
             "visual_insights": self._visual_insights,
-            "mission_objectives": self._mission_objectives, 
-            "current_flight_mode": self._current_flight_mode, 
-            "current_mission_stage": self._current_mission_stage, 
-            "mission_plan_steps": self._mission_plan_steps, 
-            "last_executed_command": self._last_executed_command, 
+            "mission_objectives": self._mission_objectives,
+            "current_flight_mode": self._current_flight_mode,
+            "current_mission_stage": self._current_mission_stage,
+            "mission_plan_steps": self._mission_plan_steps,
+            "last_executed_command": self._last_executed_command,
             "human_control_active": self._human_control_active,
             "llm_following_active": self._llm_following_active,
-            "timestamp": asyncio.get_event_loop().time() 
+            "timestamp": asyncio.get_event_loop().time()
         }
 
     def generate_llm_prompt(self) -> str:
@@ -116,7 +113,7 @@ class DroneState:
         """
         state = self.get_current_state()
         
-        telemetry = state.get("telemetry", {}) 
+        telemetry = state.get("telemetry", {})
         
         # Extract specific telemetry fields for the prompt
         position_data = telemetry.get("position", {})
@@ -135,8 +132,8 @@ class DroneState:
              telemetry_summary.append(f"Lat/Lon: {position_data['latitude_deg']:.4f},{position_data['longitude_deg']:.4f}")
         if position_ned_data.get("north_m") is not None:
             telemetry_summary.append(f"NED Pos: N={position_ned_data['north_m']:.2f}m, E={position_ned_data['east_m']:.2f}m, D={position_ned_data['down_m']:.2f}m")
-        # if velocity_data.get("ground_speed_m_s") is not None:
-        #     telemetry_summary.append(f"Ground Speed: {velocity_data['ground_speed_m_s']:.2f}m/s")
+        if velocity_data.get("ground_speed_m_s") is not None:
+            telemetry_summary.append(f"Ground Speed: {velocity_data['ground_speed_m_s']:.2f}m/s")
         if battery_data.get("remaining_percent") is not None:
             telemetry_summary.append(f"Battery: {battery_data['remaining_percent']:.1f}%")
         
@@ -148,11 +145,14 @@ class DroneState:
         detected_objects = state.get("visual_insights", {}).get("detected_objects", [])
         
         if detected_objects:
-            # Assume the first detected object is the primary focus for the LLM
             primary_detected_object = detected_objects[0]
             for obj in detected_objects:
+                obj_type = obj.get('type')
+                obj_id = obj.get('id', 'N/A') # NEW: Include ID
+                obj_pos_ned = obj.get('absolute_position_ned', {}) # NEW: Get absolute NED
+                
                 visual_summary.append(
-                    f"{obj.get('type')} at {obj.get('distance_m')}m {obj.get('relative_position')}"
+                    f"{obj_type} (ID: {obj_id}) at NED N:{obj_pos_ned.get('north_m', 'N/A'):.2f}, E:{obj_pos_ned.get('east_m', 'N/A'):.2f}, D:{obj_pos_ned.get('down_m', 'N/A'):.2f}"
                 )
             visual_str = "Detected: " + "; ".join(visual_summary) + "."
         else:
@@ -172,10 +172,10 @@ class DroneState:
         # Contextual information for the LLM
         contextual_info = (
             f"Current Drone Status:\n"
-            f"  - Drone {flying_status} and {armed_status}\n" # Added armed status
-            f"  - Flight Mode: {flight_mode}\n" # Used flight_mode from processed data
+            f"  - Drone {flying_status} and {armed_status}\n"
+            f"  - Flight Mode: {flight_mode}\n"
             f"  - Telemetry: {telemetry_str}\n"
-            f"  - Visual Insights: {visual_str}\n"
+            f"  - Visual Insights: {visual_str}\n" # This now includes target NED if detected
             f"  - Last Executed Command: {state.get('last_executed_command', {}).get('action', 'none')} (Reason: {state.get('last_executed_command', {}).get('reason', 'N/A')})\n\n"
         )
 
@@ -188,15 +188,25 @@ class DroneState:
             )
         elif state["llm_following_active"]:
             # If LLM is already following, it needs to continue or adjust
-            llm_role_guidance = (
-                f"You are currently autonomously following a detected target. "
-                f"Based on current telemetry and visual insights, continue to maintain optimal follow parameters for the primary detected object ({primary_detected_object.get('type', 'N/A')}). "
-                f"If the target is lost or the situation changes, you may suggest 'do_nothing' or 'land'."
-            )
-        elif primary_detected_object:
+            if primary_detected_object and "absolute_position_ned" in primary_detected_object:
+                target_pos_ned = primary_detected_object["absolute_position_ned"]
+                llm_role_guidance = (
+                    f"You are currently autonomously following target '{primary_detected_object.get('type', 'N/A')}' (ID: {primary_detected_object.get('id', 'N/A')}). "
+                    f"Its current absolute NED position is N:{target_pos_ned.get('north_m', 'N/A'):.2f}, E:{target_pos_ned.get('east_m', 'N/A'):.2f}, D:{target_pos_ned.get('down_m', 'N/A'):.2f}. "
+                    f"Based on current telemetry and visual insights, continue to maintain optimal follow parameters for this target. "
+                    f"If the target is lost or the situation changes, you may suggest 'do_nothing' or 'land'."
+                )
+            else:
+                llm_role_guidance = (
+                    f"You were following a target, but it is no longer detected. "
+                    f"You should now suggest 'do_nothing' or 'land'."
+                )
+        elif primary_detected_object and "absolute_position_ned" in primary_detected_object:
             # If a trigger is detected and human has released control, LLM needs to react to the trigger
+            target_pos_ned = primary_detected_object["absolute_position_ned"]
             llm_role_guidance = (
-                f"A new activity/object ('{primary_detected_object.get('type', 'N/A')}') has been detected at {primary_detected_object.get('distance_m', 'N/A')}m {primary_detected_object.get('relative_position', 'N/A')}. "
+                f"A new activity/object ('{primary_detected_object.get('type', 'N/A')}' ID: {primary_detected_object.get('id', 'N/A')}) has been detected. "
+                f"Its current absolute NED position is N:{target_pos_ned.get('north_m', 'N/A'):.2f}, E:{target_pos_ned.get('east_m', 'N/A'):.2f}, D:{target_pos_ned.get('down_m', 'N/A'):.2f}. "
                 f"The human operator has released control, and you need to propose the optimal action to address this trigger. "
                 f"Consider actions like 'follow_target' to autonomously track it, or 'do_nothing' if no action is needed."
             )
@@ -225,8 +235,11 @@ class DroneState:
             f'\n'
             f'    // Required for "follow_target":\n'
             f'    "target_id"?: string, // Identifier for the target to follow (e.g., "person_1", "vehicle_A")\n'
-            f'    "follow_distance_m"?: float, // Desired distance to maintain from the target in meters (e.g., 10.0)\n'
-            f'    "altitude_m"?: float // Desired relative altitude to maintain while following (e.g., 15.0)\n'
+            f'    "target_north_m"?: float, // NEW: Current North position of the target (absolute NED from home/start)\n'
+            f'    "target_east_m"?: float,  // NEW: Current East position of the target (absolute NED from home/start)\n'
+            f'    "target_down_m"?: float,  // NEW: Current Down position of the target (absolute NED from home/start)\n'
+            f'    "follow_distance_m"?: float, // Desired horizontal distance to maintain from the target in meters (e.g., 10.0)\n'
+            f'    "follow_altitude_m"?: float // NEW: Desired relative altitude to maintain while following (e.g., 15.0)\n'
             f'  }},\n'
             f'  "reason"?: string // Optional human-readable reason for the action\n'
             f"}}\n"
